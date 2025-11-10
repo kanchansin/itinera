@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Itenera",
+    "slug": "itenera",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "itenera",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["ios", "android", "web"],
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermissions": "Allow Itenera to access your location."
+        }
+      ]
+    ]
+  }
+}
