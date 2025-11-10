@@ -12,10 +12,10 @@ import {
   ActivityIndicator,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import DateTimePicker from "@react-native-community/datetimepicker"
 import { useTrip } from "../../hooks/useTrip"
 import { TripStopsForm } from "./TripStopsForm"
 import { AIRecommendations } from "./AIRecommendations"
+import { Platform, Modal } from "react-native"
 
 const CreateTripScreen = ({ navigation, route }) => {
   const { createTrip, loading } = useTrip()
@@ -166,7 +166,58 @@ const CreateTripScreen = ({ navigation, route }) => {
               <Ionicons name="calendar" size={20} color="#1e3a8a" />
             </TouchableOpacity>
             {showDatePicker && (
-              <DateTimePicker value={startTime} mode="datetime" display="default" onChange={handleDateChange} />
+              <Modal
+                animationType="slide"
+                transparent={true}
+                visible={showDatePicker}
+                onRequestClose={() => setShowDatePicker(false)}
+              >
+                <View className="flex-1 justify-end bg-black/50">
+                  <View className="bg-white rounded-t-xl p-4">
+                    <View className="flex-row justify-between items-center mb-4">
+                      <Text className="text-lg font-semibold">Select Date & Time</Text>
+                      <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                        <Ionicons name="close" size={24} color="#000" />
+                      </TouchableOpacity>
+                    </View>
+                    <View className="flex-row justify-around mb-4">
+                      {["Today", "Tomorrow", "Next Week"].map((option) => (
+                        <TouchableOpacity
+                          key={option}
+                          className="px-4 py-2 bg-gray-100 rounded-full"
+                          onPress={() => {
+                            const date = new Date()
+                            if (option === "Tomorrow") date.setDate(date.getDate() + 1)
+                            if (option === "Next Week") date.setDate(date.getDate() + 7)
+                            setStartTime(date)
+                            setShowDatePicker(false)
+                          }}
+                        >
+                          <Text>{option}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <View className="flex-row justify-around mb-4">
+                      {["Morning", "Afternoon", "Evening"].map((option) => (
+                        <TouchableOpacity
+                          key={option}
+                          className="px-4 py-2 bg-gray-100 rounded-full"
+                          onPress={() => {
+                            const date = new Date(startTime)
+                            if (option === "Morning") date.setHours(9, 0)
+                            if (option === "Afternoon") date.setHours(13, 0)
+                            if (option === "Evening") date.setHours(18, 0)
+                            setStartTime(date)
+                            setShowDatePicker(false)
+                          }}
+                        >
+                          <Text>{option}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+              </Modal>
             )}
           </View>
 
