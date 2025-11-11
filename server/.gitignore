@@ -1,0 +1,15 @@
+# Node dependencies
+node_modules/
+
+# Environment variables (secrets)
+.env
+.env.example
+
+# NPM crash logs
+npm-debug.log*
+
+# Optional: macOS folder
+.DS_Store
+
+# Optional: VSCode folder
+.vscode/
