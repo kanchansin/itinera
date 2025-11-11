@@ -35,7 +35,9 @@
         {
           "locationAlwaysAndWhenInUsePermissions": "Allow Itenera to access your location."
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font"
     ]
   }
 }

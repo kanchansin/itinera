@@ -1,5 +1,6 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs"
 import { Ionicons } from "@expo/vector-icons"
+import { View } from "react-native"
 import HomeScreen from "../screens/Home/HomeScreen"
 import ExploreScreen from "../screens/Explore/ExploreScreen"
 import CreateTripScreen from "../screens/CreateTrip/CreateTripScreen"
@@ -12,36 +13,63 @@ export default function TripNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerShown: true,
-        tabBarActiveTintColor: "#1e3a8a",
+        headerShown: false,
+        tabBarActiveTintColor: "#3b82f6",
         tabBarInactiveTintColor: "#9ca3af",
         tabBarStyle: {
           backgroundColor: "#ffffff",
-          borderTopColor: "#f3f4f6",
-          borderTopWidth: 1,
+          borderTopWidth: 0,
+          height: 65,
+          paddingBottom: 8,
+          paddingTop: 8,
+          elevation: 8,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
         },
-        headerStyle: {
-          backgroundColor: "#ffffff",
-          borderBottomColor: "#f3f4f6",
-          borderBottomWidth: 1,
-        },
-        headerTitleStyle: {
+        tabBarLabelStyle: {
+          fontSize: 11,
           fontWeight: "600",
-          fontSize: 18,
+          marginTop: 4,
         },
-        tabBarIcon: ({ color, size }) => {
+        tabBarIcon: ({ focused, color, size }) => {
           let iconName
 
           if (route.name === "Home") {
-            iconName = "home"
+            iconName = focused ? "home" : "home-outline"
           } else if (route.name === "Explore") {
-            iconName = "compass"
+            iconName = focused ? "compass" : "compass-outline"
           } else if (route.name === "CreateTrip") {
             iconName = "add-circle"
           } else if (route.name === "Discover") {
-            iconName = "search"
+            iconName = focused ? "search" : "search-outline"
           } else if (route.name === "Profile") {
-            iconName = "person"
+            iconName = focused ? "person" : "person-outline"
+          }
+
+          if (route.name === "CreateTrip") {
+            return (
+              <View
+                style={{
+                  position: "absolute",
+                  top: -20,
+                  backgroundColor: "#3b82f6",
+                  borderRadius: 30,
+                  width: 60,
+                  height: 60,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  shadowColor: "#3b82f6",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  elevation: 8,
+                }}
+              >
+                <Ionicons name={iconName} size={32} color="#ffffff" />
+              </View>
+            )
           }
 
           return <Ionicons name={iconName} size={size} color={color} />
@@ -52,7 +80,6 @@ export default function TripNavigator() {
         name="Home"
         component={HomeScreen}
         options={{
-          title: "My Trips",
           tabBarLabel: "Home",
         }}
       />
@@ -60,7 +87,6 @@ export default function TripNavigator() {
         name="Explore"
         component={ExploreScreen}
         options={{
-          title: "Explore Trips",
           tabBarLabel: "Explore",
         }}
       />
@@ -68,15 +94,13 @@ export default function TripNavigator() {
         name="CreateTrip"
         component={CreateTripScreen}
         options={{
-          title: "Create Trip",
-          tabBarLabel: "Create",
+          tabBarLabel: "",
         }}
       />
       <Tab.Screen
         name="Discover"
         component={DiscoverScreen}
         options={{
-          title: "Discover",
           tabBarLabel: "Discover",
         }}
       />
@@ -84,7 +108,6 @@ export default function TripNavigator() {
         name="Profile"
         component={ProfileScreen}
         options={{
-          title: "Profile",
           tabBarLabel: "Profile",
         }}
       />

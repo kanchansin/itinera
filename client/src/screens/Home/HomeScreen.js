@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, RefreshControl } from "react-native"
 import * as Location from "expo-location"
@@ -49,7 +47,6 @@ const HomeScreen = ({ navigation }) => {
         },
         (location) => {
           setUserLocation(location.coords)
-          // Update ETA based on new location
           calculateETA(location.coords, activeTrip)
         },
       )
@@ -63,10 +60,8 @@ const HomeScreen = ({ navigation }) => {
   const calculateETA = (currentLocation, trip) => {
     if (!trip || !trip.stops || trip.stops.length === 0) return
 
-    // Find next stop
-    const nextStop = trip.stops[0] // Simplified - in production, find closest upcoming stop
+    const nextStop = trip.stops[0]
 
-    // Mock ETA calculation (in production, use Google Maps API)
     const mockETA = {
       distance: Math.random() * 50,
       duration: Math.floor(Math.random() * 120) + 5,
@@ -102,88 +97,128 @@ const HomeScreen = ({ navigation }) => {
   const currentTrip = activeTrip || (trips.length > 0 ? trips[0] : null)
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-gray-50">
       <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {currentTrip ? (
           <View>
-            {/* Active Trip Header */}
-            <View className="bg-primary px-4 py-6">
-              <Text className="text-white text-lg font-semibold mb-2">{currentTrip.title}</Text>
-              <Text className="text-blue-100 text-sm mb-4">{currentTrip.destination}</Text>
+            <View className="bg-gradient-to-br from-primary-600 to-ocean-500 px-6 pt-6 pb-8 rounded-b-3xl">
+              <View className="flex-row justify-between items-start mb-4">
+                <View className="flex-1">
+                  <Text className="text-white/80 text-sm mb-1">Current Journey</Text>
+                  <Text className="text-white text-2xl font-bold">{currentTrip.title}</Text>
+                  <View className="flex-row items-center mt-2">
+                    <Ionicons name="location" size={16} color="#ffffff" />
+                    <Text className="text-white/90 text-sm ml-1">{currentTrip.destination}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity className="bg-white/20 p-3 rounded-full">
+                  <Ionicons name="notifications-outline" size={20} color="#ffffff" />
+                </TouchableOpacity>
+              </View>
 
-              {/* Live Map Preview */}
               <LiveMapPreview trip={currentTrip} userLocation={userLocation} eta={eta} />
             </View>
 
-            {/* ETA Information */}
             {eta && (
-              <View className="bg-blue-50 border-l-4 border-primary px-4 py-4 mx-4 mt-4 rounded">
-                <Text className="text-gray-700 font-semibold mb-2">Arriving at {eta.nextStop}</Text>
-                <View className="flex-row justify-between">
-                  <View>
-                    <Text className="text-xs text-gray-600">Distance</Text>
-                    <Text className="text-lg font-bold text-primary">{eta.distance.toFixed(1)} km</Text>
+              <View className="mx-6 -mt-4 bg-white rounded-2xl p-5 shadow-lg" style={{ elevation: 4 }}>
+                <Text className="text-gray-900 font-bold text-base mb-3">Next Stop: {eta.nextStop}</Text>
+                <View className="flex-row justify-between mb-4">
+                  <View className="flex-1 mr-2">
+                    <Text className="text-gray-500 text-xs mb-1">Distance</Text>
+                    <View className="flex-row items-center">
+                      <Ionicons name="navigate" size={18} color="#3b82f6" />
+                      <Text className="text-primary-600 font-bold text-xl ml-2">{eta.distance.toFixed(1)}</Text>
+                      <Text className="text-gray-500 text-sm ml-1">km</Text>
+                    </View>
                   </View>
-                  <View>
-                    <Text className="text-xs text-gray-600">ETA</Text>
-                    <Text className="text-lg font-bold text-primary">{eta.duration} min</Text>
+                  <View className="flex-1 ml-2">
+                    <Text className="text-gray-500 text-xs mb-1">ETA</Text>
+                    <View className="flex-row items-center">
+                      <Ionicons name="time" size={18} color="#06b6d4" />
+                      <Text className="text-ocean-600 font-bold text-xl ml-2">{eta.duration}</Text>
+                      <Text className="text-gray-500 text-sm ml-1">min</Text>
+                    </View>
                   </View>
                 </View>
 
                 <TouchableOpacity
-                  className="bg-primary rounded-lg py-2 mt-3 items-center"
+                  className="bg-gradient-to-r from-primary-600 to-ocean-500 rounded-xl py-3 items-center"
                   onPress={handleRecalculateRoute}
                 >
-                  <View className="flex-row items-center gap-2">
+                  <View className="flex-row items-center">
                     <Ionicons name="refresh" size={16} color="#ffffff" />
-                    <Text className="text-white font-semibold text-sm">Recalculate Route</Text>
+                    <Text className="text-white font-semibold ml-2">Recalculate Route</Text>
                   </View>
                 </TouchableOpacity>
               </View>
             )}
 
-            {/* Trip Timeline */}
-            <View className="px-4 py-6">
-              <Text className="text-lg font-bold text-gray-800 mb-4">Trip Timeline</Text>
+            <View className="px-6 py-6">
+              <View className="flex-row justify-between items-center mb-4">
+                <Text className="text-gray-900 text-xl font-bold">Trip Timeline</Text>
+                <View className="bg-primary-50 px-3 py-1 rounded-full">
+                  <Text className="text-primary-600 text-xs font-semibold">
+                    {currentTrip.stops?.length || 0} stops
+                  </Text>
+                </View>
+              </View>
               <TripTimeline stops={currentTrip.stops} />
             </View>
 
-            {/* Trip Actions */}
-            <View className="px-4 py-4 border-t border-gray-200">
+            <View className="px-6 pb-6">
               <TouchableOpacity
-                className="flex-row items-center justify-center gap-2 bg-accent rounded-lg py-3"
+                className="bg-white border border-primary-200 rounded-2xl py-4 items-center"
                 onPress={() => navigation.navigate("CreateTrip", { editTrip: currentTrip })}
               >
-                <Ionicons name="pencil" size={18} color="#ffffff" />
-                <Text className="text-white font-semibold">Edit Trip</Text>
+                <View className="flex-row items-center">
+                  <Ionicons name="pencil" size={18} color="#3b82f6" />
+                  <Text className="text-primary-600 font-semibold ml-2">Edit Trip</Text>
+                </View>
               </TouchableOpacity>
             </View>
           </View>
         ) : (
-          <View className="flex-1 items-center justify-center py-20">
-            <Ionicons name="map" size={64} color="#d1d5db" />
-            <Text className="text-gray-600 mt-4 text-center px-6">No active trips yet</Text>
+          <View className="flex-1 items-center justify-center px-6 py-20">
+            <View className="bg-gradient-to-br from-primary-100 to-ocean-100 p-8 rounded-full mb-6">
+              <Ionicons name="map-outline" size={64} color="#3b82f6" />
+            </View>
+            <Text className="text-gray-900 text-2xl font-bold mb-2">No Active Trips</Text>
+            <Text className="text-gray-500 text-center mb-8">
+              Start planning your next adventure and create unforgettable memories
+            </Text>
             <TouchableOpacity
-              className="bg-primary rounded-lg px-6 py-3 mt-6"
+              className="bg-gradient-to-r from-primary-600 to-ocean-500 rounded-2xl px-8 py-4 shadow-lg"
+              style={{ elevation: 4 }}
               onPress={() => navigation.navigate("CreateTrip")}
             >
-              <Text className="text-white font-semibold">Create Your First Trip</Text>
+              <View className="flex-row items-center">
+                <Ionicons name="add-circle" size={20} color="#ffffff" />
+                <Text className="text-white font-bold text-base ml-2">Plan Your First Trip</Text>
+              </View>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Other Trips List */}
         {trips.length > 1 && (
-          <View className="px-4 py-6 border-t border-gray-200">
-            <Text className="text-lg font-bold text-gray-800 mb-4">Other Trips</Text>
+          <View className="px-6 pb-6">
+            <Text className="text-gray-900 text-xl font-bold mb-4">Other Trips</Text>
             {trips.slice(1).map((trip) => (
               <TouchableOpacity
                 key={trip.id}
-                className="bg-gray-50 rounded-lg p-4 mb-3 border border-gray-200"
+                className="bg-white rounded-2xl p-4 mb-3 shadow-sm"
+                style={{ elevation: 2 }}
                 onPress={() => handleTripSelect(trip)}
               >
-                <Text className="font-semibold text-gray-800">{trip.title}</Text>
-                <Text className="text-sm text-gray-600 mt-1">{trip.destination}</Text>
+                <View className="flex-row items-center">
+                  <View className="bg-primary-50 p-3 rounded-xl mr-3">
+                    <Ionicons name="location" size={24} color="#3b82f6" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="font-bold text-gray-900 text-base">{trip.title}</Text>
+                    <Text className="text-gray-500 text-sm mt-1">{trip.destination}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
+                </View>
               </TouchableOpacity>
             ))}
           </View>
