@@ -13,7 +13,8 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  Alert
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -23,7 +24,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { login } = useAuth();
+  const { register, loading } = useAuth();
   const router = useRouter();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -58,7 +59,17 @@ export default function SignupPage() {
     ]).start();
   }, []);
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
+    if (!email || !password || !name) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
+      return;
+    }
+
     Animated.sequence([
       Animated.timing(signUpButtonScale, {
         toValue: 0.95,
@@ -70,10 +81,14 @@ export default function SignupPage() {
         duration: 100,
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      login();
+    ]).start();
+
+    try {
+      await register(email, password, name);
       router.replace("/(tabs)");
-    });
+    } catch (err: any) {
+      Alert.alert('Signup Failed', err.message || 'Failed to create account');
+    }
   };
 
   const handleGoogleLogin = () => {
@@ -89,8 +104,7 @@ export default function SignupPage() {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      login();
-      router.replace("/(tabs)");
+      Alert.alert('Info', 'Google login coming soon');
     });
   };
 
@@ -158,6 +172,7 @@ export default function SignupPage() {
                   value={name}
                   onChangeText={setName}
                   returnKeyType="next"
+                  editable={!loading}
                 />
               </View>
             </View>
@@ -175,6 +190,7 @@ export default function SignupPage() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   returnKeyType="next"
+                  editable={!loading}
                 />
               </View>
             </View>
@@ -192,6 +208,7 @@ export default function SignupPage() {
                   secureTextEntry={!showPassword}
                   returnKeyType="done"
                   onSubmitEditing={handleSignup}
+                  editable={!loading}
                 />
                 <TouchableOpacity 
                   onPress={() => setShowPassword(!showPassword)}
@@ -207,14 +224,14 @@ export default function SignupPage() {
             </View>
 
             <Animated.View style={[styles.signInButton, { transform: [{ scale: signUpButtonScale }] }]}>
-              <TouchableOpacity onPress={handleSignup}>
+              <TouchableOpacity onPress={handleSignup} disabled={loading}>
                 <LinearGradient
                   colors={['#ff7b54', '#ff9a8b']}
                   start={[0, 0]}
                   end={[1, 0]}
-                  style={styles.signInGradient}
+                  style={[styles.signInGradient, loading && { opacity: 0.6 }]}
                 >
-                  <Text style={styles.signInText}>Create Account</Text>
+                  <Text style={styles.signInText}>{loading ? 'Creating Account...' : 'Create Account'}</Text>
                   <Ionicons name="arrow-forward" size={20} color="#ffffff" />
                 </LinearGradient>
               </TouchableOpacity>

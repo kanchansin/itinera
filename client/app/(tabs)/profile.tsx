@@ -14,17 +14,25 @@ import {
 } from 'react-native';
 
 export default function Profile() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const router = useRouter();
   
-  const userData = {
-    name: "Kanchan Singh",
-    email: "kanchan.singh@example.com",
+  const userData = user ? {
+    name: user.name,
+    email: user.email,
     phone: "+91 70814 99993",
     joinDate: "March 2023",
     totalTrips: 12,
     upcomingTrips: 2,
     savedPlans: 5,
+  } : {
+    name: "User",
+    email: "user@example.com",
+    phone: "+91 XXXXXXXXXX",
+    joinDate: "Now",
+    totalTrips: 0,
+    upcomingTrips: 0,
+    savedPlans: 0,
   };
 
   const handleLogout = () => {

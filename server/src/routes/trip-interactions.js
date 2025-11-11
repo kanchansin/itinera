@@ -1,7 +1,7 @@
 import express from "express"
 import { verifyToken } from "../middlewares/auth.js"
 import {
-  likeTip,
+  likeTrip,
   unlikeTrip,
   saveTrip,
   unsaveTrip,
@@ -12,7 +12,7 @@ import {
 
 const router = express.Router()
 
-router.post("/:tripId/like", verifyToken, likeTip)
+router.post("/:tripId/like", verifyToken, likeTrip)
 router.delete("/:tripId/like", verifyToken, unlikeTrip)
 router.post("/:tripId/save", verifyToken, saveTrip)
 router.delete("/:tripId/save", verifyToken, unsaveTrip)

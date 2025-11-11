@@ -1,132 +1,161 @@
-import pool from "../config/database.js"
-
-export const likeTip = async (req, res) => {
+import { getDB } from "../config/database.js"
+export const likeTrip = async (req, res) => {
   try {
     const { tripId } = req.params
     const userId = req.user.userId
-
-    await pool.query("INSERT INTO trip_likes (user_id, trip_id) VALUES ($1, $2)", [userId, tripId])
-
-    // Update likes count
-    const result = await pool.query("UPDATE trips SET likes_count = likes_count + 1 WHERE id = $1 RETURNING *", [
-      tripId,
-    ])
-
-    res.json(result.rows[0])
-  } catch (error) {
-    if (error.code === "23505") {
+    const db = getDB()
+    const likeRef = db.collection("tripLikes").doc(`${userId}_${tripId}`)
+    const likeSnapshot = await likeRef.get()
+    if (likeSnapshot.exists) {
       return res.status(400).json({ error: "Trip already liked" })
     }
+    await likeRef.set({
+      id: likeRef.id,
+      userId,
+      tripId,
+      createdAt: new Date().toISOString(),
+    })
+    const likesSnapshot = await db.collection("tripLikes").where("tripId", "==", tripId).get()
+    await db.collection("trips").doc(tripId).update({
+      likesCount: likesSnapshot.docs.length,
+    })
+    const tripSnapshot = await db.collection("trips").doc(tripId).get()
+    res.json(tripSnapshot.data())
+  } catch (error) {
+    console.error("Like Trip Error:", error.message)
     res.status(500).json({ error: error.message })
   }
 }
-
 export const unlikeTrip = async (req, res) => {
   try {
     const { tripId } = req.params
     const userId = req.user.userId
-
-    await pool.query("DELETE FROM trip_likes WHERE user_id = $1 AND trip_id = $2", [userId, tripId])
-
-    const result = await pool.query(
-      "UPDATE trips SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = $1 RETURNING *",
-      [tripId],
-    )
-
-    res.json(result.rows[0])
+    const db = getDB()
+    const likeRef = db.collection("tripLikes").doc(`${userId}_${tripId}`)
+    await likeRef.delete()
+    const likesSnapshot = await db.collection("tripLikes").where("tripId", "==", tripId).get()
+    await db.collection("trips").doc(tripId).update({
+      likesCount: Math.max(likesSnapshot.docs.length, 0),
+    })
+    const tripSnapshot = await db.collection("trips").doc(tripId).get()
+    res.json(tripSnapshot.data())
   } catch (error) {
+    console.error("Unlike Trip Error:", error.message)
     res.status(500).json({ error: error.message })
   }
 }
-
 export const saveTrip = async (req, res) => {
   try {
     const { tripId } = req.params
     const userId = req.user.userId
-
-    await pool.query("INSERT INTO saved_trips (user_id, trip_id) VALUES ($1, $2)", [userId, tripId])
-
-    res.json({ message: "Trip saved" })
-  } catch (error) {
-    if (error.code === "23505") {
+    const db = getDB()
+    const saveRef = db.collection("savedTrips").doc(`${userId}_${tripId}`)
+    const saveSnapshot = await saveRef.get()
+    if (saveSnapshot.exists) {
       return res.status(400).json({ error: "Trip already saved" })
     }
+    await saveRef.set({
+      id: saveRef.id,
+      userId,
+      tripId,
+      createdAt: new Date().toISOString(),
+    })
+    res.json({ message: "Trip saved" })
+  } catch (error) {
+    console.error("Save Trip Error:", error.message)
     res.status(500).json({ error: error.message })
   }
 }
-
 export const unsaveTrip = async (req, res) => {
   try {
     const { tripId } = req.params
     const userId = req.user.userId
-
-    await pool.query("DELETE FROM saved_trips WHERE user_id = $1 AND trip_id = $2", [userId, tripId])
-
+    const db = getDB()
+    const saveRef = db.collection("savedTrips").doc(`${userId}_${tripId}`)
+    await saveRef.delete()
     res.json({ message: "Trip unsaved" })
   } catch (error) {
+    console.error("Unsave Trip Error:", error.message)
     res.status(500).json({ error: error.message })
   }
 }
-
 export const getSavedTrips = async (req, res) => {
   try {
     const userId = req.user.userId
     const { limit = 20, offset = 0 } = req.query
-
-    const result = await pool.query(
-      `SELECT t.* FROM trips t
-       INNER JOIN saved_trips st ON t.id = st.trip_id
-       WHERE st.user_id = $1
-       ORDER BY st.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [userId, limit, offset],
+    const db = getDB()
+    const savesSnapshot = await db
+      .collection("savedTrips")
+      .where("userId", "==", userId)
+      .orderBy("createdAt", "desc")
+      .limit(parseInt(limit))
+      .offset(parseInt(offset))
+      .get()
+    const trips = await Promise.all(
+      savesSnapshot.docs.map(async (saveDoc) => {
+        const tripSnapshot = await db.collection("trips").doc(saveDoc.data().tripId).get()
+        return tripSnapshot.exists ? tripSnapshot.data() : null
+      }),
     )
-
-    res.json(result.rows)
+    const filteredTrips = trips.filter((trip) => trip !== null)
+    res.json(filteredTrips)
   } catch (error) {
+    console.error("Get Saved Trips Error:", error.message)
     res.status(500).json({ error: error.message })
   }
 }
-
 export const addComment = async (req, res) => {
   try {
     const { tripId } = req.params
     const userId = req.user.userId
     const { comment } = req.body
-
     if (!comment) {
       return res.status(400).json({ error: "Comment is required" })
     }
-
-    const result = await pool.query(
-      `INSERT INTO trip_comments (user_id, trip_id, comment)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      [userId, tripId, comment],
-    )
-
-    res.status(201).json(result.rows[0])
+    const db = getDB()
+    const commentRef = db.collection("tripComments").doc()
+    const commentId = commentRef.id
+    await commentRef.set({
+      id: commentId,
+      userId,
+      tripId,
+      comment,
+      createdAt: new Date().toISOString(),
+    })
+    const commentSnapshot = await commentRef.get()
+    res.status(201).json(commentSnapshot.data())
   } catch (error) {
+    console.error("Add Comment Error:", error.message)
     res.status(500).json({ error: error.message })
   }
 }
-
 export const getComments = async (req, res) => {
   try {
     const { tripId } = req.params
     const { limit = 10 } = req.query
-
-    const result = await pool.query(
-      `SELECT c.*, u.name, u.profile_picture FROM trip_comments c
-       JOIN users u ON c.user_id = u.id
-       WHERE c.trip_id = $1
-       ORDER BY c.created_at DESC
-       LIMIT $2`,
-      [tripId, limit],
+    const db = getDB()
+    const commentsSnapshot = await db
+      .collection("tripComments")
+      .where("tripId", "==", tripId)
+      .orderBy("createdAt", "desc")
+      .limit(parseInt(limit))
+      .get()
+    const comments = await Promise.all(
+      commentsSnapshot.docs.map(async (commentDoc) => {
+        const comment = commentDoc.data()
+        const userRef = db.collection("users").doc(comment.userId)
+        const userSnapshot = await userRef.get()
+        const user = userSnapshot.exists ? userSnapshot.data() : {}
+        return {
+          ...comment,
+          userName: user.name,
+          userProfilePicture: user.profilePicture,
+        }
+      }),
     )
-
-    res.json(result.rows)
+    res.json(comments)
   } catch (error) {
+    console.error("Get Comments Error:", error.message)
     res.status(500).json({ error: error.message })
   }
 }

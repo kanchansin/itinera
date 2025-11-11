@@ -12,15 +12,13 @@ import {
 
 const router = express.Router()
 
-// Protected routes
+router.post("/calculate-duration", calculateTripDuration)
+router.get("/explore/feed", getPublicTrips)
+
 router.post("/", verifyToken, createTrip)
 router.get("/", verifyToken, getTrips)
 router.get("/:id", verifyToken, getTripById)
 router.put("/:id", verifyToken, updateTrip)
 router.delete("/:id", verifyToken, deleteTrip)
-router.post("/calculate-duration", calculateTripDuration)
-
-// Public routes
-router.get("/explore/feed", getPublicTrips)
 
 export default router
