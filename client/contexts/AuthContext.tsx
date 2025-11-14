@@ -14,7 +14,7 @@ interface AuthContextType {
   accessToken: string | null;
   refreshToken: string | null;
   login: (email: string, password: string) => Promise<void>;
-  googleLogin: (idToken: string) => Promise<void>;
+  googleLogin: (idToken: string, displayName?: string, email?: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   loading: boolean;
@@ -37,18 +37,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const bootstrapAsync = async () => {
     try {
+      console.log('[AUTH] Bootstrapping - checking for stored session');
       const storedAccessToken = await AsyncStorage.getItem('accessToken');
       const storedRefreshToken = await AsyncStorage.getItem('refreshToken');
       const storedUser = await AsyncStorage.getItem('user');
 
       if (storedAccessToken && storedUser) {
+        console.log('[AUTH] Stored session found');
         setAccessToken(storedAccessToken);
         setRefreshToken(storedRefreshToken);
         setUser(JSON.parse(storedUser));
         setIsAuthenticated(true);
+        console.log('[AUTH] Session restored');
+      } else {
+        console.log('[AUTH] No stored session found');
       }
     } catch (e) {
-      console.error('Failed to restore session:', e);
+      console.error('[AUTH] Failed to restore session:', e);
     } finally {
       setLoading(false);
     }
@@ -58,18 +63,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     setError(null);
     try {
+      console.log('[AUTH] Login started for:', email);
       const response = await authAPI.login({ email, password });
+      console.log('[AUTH] Login response received:', response);
       const { user: userData, accessToken: newAccessToken, refreshToken: newRefreshToken } = response;
 
+      console.log('[AUTH] Storing tokens in AsyncStorage');
       await AsyncStorage.setItem('accessToken', newAccessToken);
       await AsyncStorage.setItem('refreshToken', newRefreshToken);
       await AsyncStorage.setItem('user', JSON.stringify(userData));
 
+      console.log('[AUTH] Updating state');
       setAccessToken(newAccessToken);
       setRefreshToken(newRefreshToken);
       setUser(userData);
       setIsAuthenticated(true);
+      console.log('[AUTH] Login completed successfully');
     } catch (err: any) {
+      console.error('[AUTH] Login error caught:', err);
+      console.error('[AUTH] Error message:', err.message);
       const errorMessage = err.message || 'Login failed';
       setError(errorMessage);
       throw err;
@@ -78,22 +90,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const googleLogin = async (idToken: string) => {
+  const googleLogin = async (idToken: string, displayName?: string, email?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await authAPI.googleAuth({ idToken });
+      console.log('[AUTH] Google login started');
+      const response = await authAPI.googleAuth({
+        idToken,
+        displayName: displayName || '',
+        email: email || ''
+      });
+      console.log('[AUTH] Google login response received:', response);
       const { user: userData, accessToken: newAccessToken, refreshToken: newRefreshToken } = response;
 
+      console.log('[AUTH] Storing tokens in AsyncStorage');
       await AsyncStorage.setItem('accessToken', newAccessToken);
       await AsyncStorage.setItem('refreshToken', newRefreshToken);
       await AsyncStorage.setItem('user', JSON.stringify(userData));
 
+      console.log('[AUTH] Updating state');
       setAccessToken(newAccessToken);
       setRefreshToken(newRefreshToken);
       setUser(userData);
       setIsAuthenticated(true);
+      console.log('[AUTH] Google login completed successfully');
     } catch (err: any) {
+      console.error('[AUTH] Google login error caught:', err);
+      console.error('[AUTH] Error message:', err.message);
       const errorMessage = err.message || 'Google login failed';
       setError(errorMessage);
       throw err;
@@ -106,18 +129,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     setError(null);
     try {
+      console.log('[AUTH] Register started for:', email);
       const response = await authAPI.register({ email, password, name });
+      console.log('[AUTH] Register response received:', response);
       const { user: userData, accessToken: newAccessToken, refreshToken: newRefreshToken } = response;
 
+      console.log('[AUTH] Storing tokens in AsyncStorage');
       await AsyncStorage.setItem('accessToken', newAccessToken);
       await AsyncStorage.setItem('refreshToken', newRefreshToken);
       await AsyncStorage.setItem('user', JSON.stringify(userData));
 
+      console.log('[AUTH] Updating state');
       setAccessToken(newAccessToken);
       setRefreshToken(newRefreshToken);
       setUser(userData);
       setIsAuthenticated(true);
+      console.log('[AUTH] Register completed successfully');
     } catch (err: any) {
+      console.error('[AUTH] Register error caught:', err);
+      console.error('[AUTH] Error message:', err.message);
       const errorMessage = err.message || 'Registration failed';
       setError(errorMessage);
       throw err;
@@ -128,6 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
+      console.log('[AUTH] Logout started');
       await AsyncStorage.removeItem('accessToken');
       await AsyncStorage.removeItem('refreshToken');
       await AsyncStorage.removeItem('user');
@@ -136,8 +167,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setIsAuthenticated(false);
       setError(null);
+      console.log('[AUTH] Logout completed successfully');
     } catch (err) {
-      console.error('Logout failed:', err);
+      console.error('[AUTH] Logout failed:', err);
     }
   };
 

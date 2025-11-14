@@ -1,6 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Google from 'expo-auth-session/providers/google';
 import { Link, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
@@ -16,16 +17,19 @@ import {
   View,
   Alert
 } from 'react-native';
+import { getGoogleAuthConfig } from '@/config/googleAuth';
 
 const { width, height } = Dimensions.get('window');
+const googleAuthConfig = getGoogleAuthConfig();
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { register, loading } = useAuth();
+  const { register, googleLogin, loading } = useAuth();
   const router = useRouter();
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest(googleAuthConfig);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const signUpButtonScale = useRef(new Animated.Value(1)).current;
@@ -43,6 +47,15 @@ export default function SignupPage() {
     outputRange: [1, 0.3],
     extrapolate: 'clamp'
   });
+
+  React.useEffect(() => {
+    if (response?.type === 'success' && response.authentication) {
+      const idToken = response.authentication.idToken;
+      if (idToken) {
+        handleGoogleSignIn(idToken);
+      }
+    }
+  }, [response]);
 
   React.useEffect(() => {
     Animated.parallel([
@@ -70,6 +83,8 @@ export default function SignupPage() {
       return;
     }
 
+    console.log('[SIGNUP] Attempting signup with email:', email);
+
     Animated.sequence([
       Animated.timing(signUpButtonScale, {
         toValue: 0.95,
@@ -84,14 +99,31 @@ export default function SignupPage() {
     ]).start();
 
     try {
+      console.log('[SIGNUP] Calling register function');
       await register(email, password, name);
+      console.log('[SIGNUP] Signup successful, navigating to home');
       router.replace("/(tabs)");
     } catch (err: any) {
+      console.log('[SIGNUP] Signup failed with error:', err.message);
       Alert.alert('Signup Failed', err.message || 'Failed to create account');
     }
   };
 
+  const handleGoogleSignIn = async (idToken: string) => {
+    try {
+      console.log('[GOOGLE_SIGNUP] Starting Google sign-in process');
+      console.log('[GOOGLE_SIGNUP] Calling googleLogin with idToken');
+      await googleLogin(idToken);
+      console.log('[GOOGLE_SIGNUP] Google signup successful, navigating to home');
+      router.replace("/(tabs)");
+    } catch (err: any) {
+      console.log('[GOOGLE_SIGNUP] Google sign-in failed with error:', err.message);
+      Alert.alert('Google Sign-In Failed', err.message || 'Failed to sign in with Google');
+    }
+  };
+
   const handleGoogleLogin = () => {
+    console.log('[GOOGLE_SIGNUP] Initiating Google authentication flow');
     Animated.sequence([
       Animated.timing(googleButtonScale, {
         toValue: 0.95,
@@ -104,7 +136,8 @@ export default function SignupPage() {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      Alert.alert('Info', 'Google login coming soon');
+      console.log('[GOOGLE_SIGNUP] Calling promptAsync');
+      promptAsync();
     });
   };
 
@@ -240,7 +273,7 @@ export default function SignupPage() {
             <Text style={styles.orText}>or</Text>
 
             <Animated.View style={{ transform: [{ scale: googleButtonScale }] }}>
-              <TouchableOpacity onPress={handleGoogleLogin} style={styles.googleButton}>
+              <TouchableOpacity onPress={handleGoogleLogin} style={styles.googleButton} disabled={loading}>
                 <View style={styles.googleButtonContent}>
                   <Ionicons name="logo-google" size={20} color="#ffffff" style={styles.googleIcon} />
                   <Text style={styles.googleText}>Continue with Google</Text>

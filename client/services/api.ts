@@ -22,15 +22,39 @@ const apiCall = async (endpoint: string, options: RequestOptions = {}) => {
   }
 
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, requestOptions);
+    console.log('[API] Making request:', method, `${API_URL}${endpoint}`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      ...requestOptions,
+      signal: controller.signal
+    });
 
+    clearTimeout(timeoutId);
+    console.log('[API] Response status:', response.status);
+    
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Request failed');
+      console.log('[API] Response not ok, attempting to parse error');
+      let errorData;
+      try {
+        errorData = await response.json();
+        console.log('[API] Error response:', errorData);
+      } catch (parseErr) {
+        console.log('[API] Could not parse error response as JSON');
+        errorData = { error: response.statusText || 'Request failed' };
+      }
+      throw new Error(errorData.error || 'Request failed');
     }
 
-    return await response.json();
-  } catch (error) {
+    const responseData = await response.json();
+    console.log('[API] Success response received');
+    return responseData;
+  } catch (error: any) {
+    console.error('[API] Error:', error.message);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout - server not responding');
+    }
     throw error;
   }
 };
@@ -48,7 +72,7 @@ export const authAPI = {
       body: data,
     }),
 
-  googleAuth: (data: { idToken: string }) =>
+  googleAuth: (data: { idToken: string; displayName: string; email: string }) =>
     apiCall('/auth/google', {
       method: 'POST',
       body: data,

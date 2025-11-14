@@ -13,3 +13,17 @@ npm-debug.log*
 
 # Optional: VSCode folder
 .vscode/
+
+# Lock files
+package-lock.json
+yarn.lock
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Gradle build artifacts
+*.gradle
+.gradle/
+build/
