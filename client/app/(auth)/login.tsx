@@ -1,7 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Google from 'expo-auth-session/providers/google';
 import { Link, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
@@ -17,10 +16,8 @@ import {
   View,
   Alert
 } from 'react-native';
-import { getGoogleAuthConfig } from '@/config/googleAuth';
 
 const { width, height } = Dimensions.get('window');
-const googleAuthConfig = getGoogleAuthConfig();
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -28,7 +25,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const { login, googleLogin, loading } = useAuth();
   const router = useRouter();
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest(googleAuthConfig);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const signInButtonScale = useRef(new Animated.Value(1)).current;
@@ -46,15 +42,6 @@ export default function LoginPage() {
     outputRange: [1, 0.3],
     extrapolate: 'clamp'
   });
-
-  React.useEffect(() => {
-    if (response?.type === 'success' && response.authentication) {
-      const { idToken, accessToken } = response.authentication;
-      if (idToken) {
-        handleGoogleSignIn(idToken, accessToken);
-      }
-    }
-  }, [response]);
 
   React.useEffect(() => {
     Animated.parallel([
@@ -103,28 +90,7 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleSignIn = async (idToken: string, accessToken?: string) => {
-    try {
-      console.log('[GOOGLE_LOGIN] Starting Google sign-in process');
-      console.log('[GOOGLE_LOGIN] Fetching user info from Google');
-      const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${accessToken || idToken}` },
-      });
-      
-      const userInfo = await userInfoResponse.json();
-      console.log('[GOOGLE_LOGIN] User info received:', userInfo.email);
-      
-      console.log('[GOOGLE_LOGIN] Calling googleLogin with idToken and user info');
-      await googleLogin(idToken, userInfo.name, userInfo.email);
-      console.log('[GOOGLE_LOGIN] Google login successful, navigating to home');
-      router.replace("/(tabs)");
-    } catch (err: any) {
-      console.log('[GOOGLE_LOGIN] Google sign-in failed with error:', err.message);
-      Alert.alert('Google Sign-In Failed', err.message || 'Failed to sign in with Google');
-    }
-  };
-
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     console.log('[GOOGLE_LOGIN] Initiating Google authentication flow');
     Animated.sequence([
       Animated.timing(googleButtonScale, {
@@ -137,10 +103,17 @@ export default function LoginPage() {
         duration: 100,
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      console.log('[GOOGLE_LOGIN] Calling promptAsync');
-      promptAsync();
-    });
+    ]).start();
+
+    try {
+      console.log('[GOOGLE_LOGIN] Calling googleLogin');
+      await googleLogin();
+      console.log('[GOOGLE_LOGIN] Google login successful, navigating to home');
+      router.replace("/(tabs)");
+    } catch (err: any) {
+      console.log('[GOOGLE_LOGIN] Google sign-in failed with error:', err.message);
+      Alert.alert('Google Sign-In Failed', err.message || 'Failed to sign in with Google');
+    }
   };
 
   return (

@@ -1,6 +1,32 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authAPI } from '@/services/api';
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  signInWithCredential,
+  GoogleAuthProvider,
+  signOut,
+  updateProfile
+} from 'firebase/auth';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
+
+WebBrowser.maybeCompleteAuthSession();
+
+const firebaseConfig = {
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 
 interface User {
   id: string;
@@ -14,7 +40,7 @@ interface AuthContextType {
   accessToken: string | null;
   refreshToken: string | null;
   login: (email: string, password: string) => Promise<void>;
-  googleLogin: (idToken: string, displayName?: string, email?: string) => Promise<void>;
+  googleLogin: () => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   loading: boolean;
@@ -31,9 +57,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    clientId: Platform.select({
+      android: process.env.EXPO_PUBLIC_ANDROID_CLIENT_ID,
+      ios: process.env.EXPO_PUBLIC_IOS_CLIENT_ID,
+      web: process.env.EXPO_PUBLIC_WEB_CLIENT_ID,
+    }),
+  });
+
   useEffect(() => {
     bootstrapAsync();
   }, []);
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { id_token } = response.params;
+      handleGoogleSignInWithToken(id_token);
+    }
+  }, [response]);
 
   const bootstrapAsync = async () => {
     try {
@@ -59,69 +100,99 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const handleGoogleSignInWithToken = async (idToken: string) => {
+    try {
+      console.log('[GOOGLE_AUTH] Signing in with Firebase credential');
+      const credential = GoogleAuthProvider.credential(idToken);
+      const userCredential = await signInWithCredential(auth, credential);
+      
+      console.log('[GOOGLE_AUTH] Firebase sign-in successful');
+      const firebaseUser = userCredential.user;
+      const token = await firebaseUser.getIdToken();
+      
+      const userData: User = {
+        id: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+      };
+
+      console.log('[GOOGLE_AUTH] Storing tokens in AsyncStorage');
+      await AsyncStorage.setItem('accessToken', token);
+      await AsyncStorage.setItem('refreshToken', token);
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
+
+      console.log('[GOOGLE_AUTH] Updating state');
+      setAccessToken(token);
+      setRefreshToken(token);
+      setUser(userData);
+      setIsAuthenticated(true);
+      console.log('[GOOGLE_AUTH] Google login completed successfully');
+    } catch (err: any) {
+      console.error('[GOOGLE_AUTH] Error:', err);
+      throw new Error(err.message || 'Google sign-in failed');
+    }
+  };
+
   const login = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
     try {
       console.log('[AUTH] Login started for:', email);
-      const response = await authAPI.login({ email, password });
-      console.log('[AUTH] Login response received:', response);
-      const { user: userData, accessToken: newAccessToken, refreshToken: newRefreshToken } = response;
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log('[AUTH] Login response received');
+      
+      const firebaseUser = userCredential.user;
+      const token = await firebaseUser.getIdToken();
+      
+      const userData: User = {
+        id: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+      };
 
       console.log('[AUTH] Storing tokens in AsyncStorage');
-      await AsyncStorage.setItem('accessToken', newAccessToken);
-      await AsyncStorage.setItem('refreshToken', newRefreshToken);
+      await AsyncStorage.setItem('accessToken', token);
+      await AsyncStorage.setItem('refreshToken', token);
       await AsyncStorage.setItem('user', JSON.stringify(userData));
 
       console.log('[AUTH] Updating state');
-      setAccessToken(newAccessToken);
-      setRefreshToken(newRefreshToken);
+      setAccessToken(token);
+      setRefreshToken(token);
       setUser(userData);
       setIsAuthenticated(true);
       console.log('[AUTH] Login completed successfully');
     } catch (err: any) {
       console.error('[AUTH] Login error caught:', err);
-      console.error('[AUTH] Error message:', err.message);
-      const errorMessage = err.message || 'Login failed';
+      let errorMessage = 'Login failed';
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+        errorMessage = 'Invalid email or password';
+      } else if (err.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email';
+      } else if (err.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many attempts. Please try again later';
+      }
       setError(errorMessage);
-      throw err;
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const googleLogin = async (idToken: string, displayName?: string, email?: string) => {
+  const googleLogin = async () => {
     setLoading(true);
     setError(null);
     try {
       console.log('[AUTH] Google login started');
-      const response = await authAPI.googleAuth({
-        idToken,
-        displayName: displayName || '',
-        email: email || ''
-      });
-      console.log('[AUTH] Google login response received:', response);
-      const { user: userData, accessToken: newAccessToken, refreshToken: newRefreshToken } = response;
-
-      console.log('[AUTH] Storing tokens in AsyncStorage');
-      await AsyncStorage.setItem('accessToken', newAccessToken);
-      await AsyncStorage.setItem('refreshToken', newRefreshToken);
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
-
-      console.log('[AUTH] Updating state');
-      setAccessToken(newAccessToken);
-      setRefreshToken(newRefreshToken);
-      setUser(userData);
-      setIsAuthenticated(true);
-      console.log('[AUTH] Google login completed successfully');
+      const result = await promptAsync();
+      if (result.type !== 'success') {
+        throw new Error('Google sign-in was cancelled');
+      }
     } catch (err: any) {
       console.error('[AUTH] Google login error caught:', err);
-      console.error('[AUTH] Error message:', err.message);
       const errorMessage = err.message || 'Google login failed';
       setError(errorMessage);
-      throw err;
-    } finally {
       setLoading(false);
+      throw err;
     }
   };
 
@@ -130,27 +201,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       console.log('[AUTH] Register started for:', email);
-      const response = await authAPI.register({ email, password, name });
-      console.log('[AUTH] Register response received:', response);
-      const { user: userData, accessToken: newAccessToken, refreshToken: newRefreshToken } = response;
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      console.log('[AUTH] Register response received');
+      
+      const firebaseUser = userCredential.user;
+      
+      await updateProfile(firebaseUser, {
+        displayName: name,
+      });
+      
+      const token = await firebaseUser.getIdToken();
+      
+      const userData: User = {
+        id: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        name: name,
+      };
 
       console.log('[AUTH] Storing tokens in AsyncStorage');
-      await AsyncStorage.setItem('accessToken', newAccessToken);
-      await AsyncStorage.setItem('refreshToken', newRefreshToken);
+      await AsyncStorage.setItem('accessToken', token);
+      await AsyncStorage.setItem('refreshToken', token);
       await AsyncStorage.setItem('user', JSON.stringify(userData));
 
       console.log('[AUTH] Updating state');
-      setAccessToken(newAccessToken);
-      setRefreshToken(newRefreshToken);
+      setAccessToken(token);
+      setRefreshToken(token);
       setUser(userData);
       setIsAuthenticated(true);
       console.log('[AUTH] Register completed successfully');
     } catch (err: any) {
       console.error('[AUTH] Register error caught:', err);
-      console.error('[AUTH] Error message:', err.message);
-      const errorMessage = err.message || 'Registration failed';
+      let errorMessage = 'Registration failed';
+      if (err.code === 'auth/email-already-in-use') {
+        errorMessage = 'Email already registered. Please log in instead.';
+      } else if (err.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address';
+      } else if (err.code === 'auth/weak-password') {
+        errorMessage = 'Password should be at least 6 characters';
+      }
       setError(errorMessage);
-      throw err;
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -159,6 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       console.log('[AUTH] Logout started');
+      await signOut(auth);
       await AsyncStorage.removeItem('accessToken');
       await AsyncStorage.removeItem('refreshToken');
       await AsyncStorage.removeItem('user');

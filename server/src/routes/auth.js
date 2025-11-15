@@ -1,5 +1,5 @@
 import express from "express"
-import { googleAuth, refreshToken, login, register } from "../controllers/authController.js"
+import { verifyFirebaseToken, refreshToken } from "../controllers/authController.js"
 
 const router = express.Router()
 
@@ -11,9 +11,7 @@ const asyncHandler = (fn) => (req, res, next) => {
   }
 }
 
-router.post("/google", asyncHandler(googleAuth))
+router.post("/firebase", asyncHandler(verifyFirebaseToken))
 router.post("/refresh-token", asyncHandler(refreshToken))
-router.post("/login", asyncHandler(login))
-router.post("/register", asyncHandler(register))
 
 export default router

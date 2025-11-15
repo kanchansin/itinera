@@ -1,7 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Google from 'expo-auth-session/providers/google';
 import { Link, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
@@ -17,10 +16,8 @@ import {
   View,
   Alert
 } from 'react-native';
-import { getGoogleAuthConfig } from '@/config/googleAuth';
 
 const { width, height } = Dimensions.get('window');
-const googleAuthConfig = getGoogleAuthConfig();
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -29,7 +26,6 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const { register, googleLogin, loading } = useAuth();
   const router = useRouter();
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest(googleAuthConfig);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const signUpButtonScale = useRef(new Animated.Value(1)).current;
@@ -47,15 +43,6 @@ export default function SignupPage() {
     outputRange: [1, 0.3],
     extrapolate: 'clamp'
   });
-
-  React.useEffect(() => {
-    if (response?.type === 'success' && response.authentication) {
-      const idToken = response.authentication.idToken;
-      if (idToken) {
-        handleGoogleSignIn(idToken);
-      }
-    }
-  }, [response]);
 
   React.useEffect(() => {
     Animated.parallel([
@@ -109,20 +96,7 @@ export default function SignupPage() {
     }
   };
 
-  const handleGoogleSignIn = async (idToken: string) => {
-    try {
-      console.log('[GOOGLE_SIGNUP] Starting Google sign-in process');
-      console.log('[GOOGLE_SIGNUP] Calling googleLogin with idToken');
-      await googleLogin(idToken);
-      console.log('[GOOGLE_SIGNUP] Google signup successful, navigating to home');
-      router.replace("/(tabs)");
-    } catch (err: any) {
-      console.log('[GOOGLE_SIGNUP] Google sign-in failed with error:', err.message);
-      Alert.alert('Google Sign-In Failed', err.message || 'Failed to sign in with Google');
-    }
-  };
-
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     console.log('[GOOGLE_SIGNUP] Initiating Google authentication flow');
     Animated.sequence([
       Animated.timing(googleButtonScale, {
@@ -135,10 +109,17 @@ export default function SignupPage() {
         duration: 100,
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      console.log('[GOOGLE_SIGNUP] Calling promptAsync');
-      promptAsync();
-    });
+    ]).start();
+
+    try {
+      console.log('[GOOGLE_SIGNUP] Calling googleLogin');
+      await googleLogin();
+      console.log('[GOOGLE_SIGNUP] Google signup successful, navigating to home');
+      router.replace("/(tabs)");
+    } catch (err: any) {
+      console.log('[GOOGLE_SIGNUP] Google sign-in failed with error:', err.message);
+      Alert.alert('Google Sign-In Failed', err.message || 'Failed to sign in with Google');
+    }
   };
 
   return (

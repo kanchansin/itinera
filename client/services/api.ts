@@ -60,22 +60,10 @@ const apiCall = async (endpoint: string, options: RequestOptions = {}) => {
 };
 
 export const authAPI = {
-  register: (data: { email: string; password: string; name: string }) =>
-    apiCall('/auth/register', {
+  verifyFirebaseToken: (idToken: string) =>
+    apiCall('/auth/firebase', {
       method: 'POST',
-      body: data,
-    }),
-
-  login: (data: { email: string; password: string }) =>
-    apiCall('/auth/login', {
-      method: 'POST',
-      body: data,
-    }),
-
-  googleAuth: (data: { idToken: string; displayName: string; email: string }) =>
-    apiCall('/auth/google', {
-      method: 'POST',
-      body: data,
+      body: { idToken },
     }),
 
   refreshToken: (refreshToken: string) =>
