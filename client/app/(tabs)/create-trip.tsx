@@ -9,13 +9,16 @@ import {
   StyleSheet,
   Dimensions,
   ActivityIndicator,
-  FlatList,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Polyline, Marker } from 'react-native-maps';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import axios from 'axios';
+import { useAuth } from '@/contexts/AuthContext';
+import { db } from '@/services/firebase';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 
 const { width } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:5000/api';
@@ -53,6 +56,7 @@ interface LocationSuggestion {
 export default function CreateTripScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
+  const { user, accessToken } = useAuth();
   const editMode = params.editMode === 'true';
   const existingTrip = params.tripData ? JSON.parse(params.tripData as string) : null;
 
@@ -67,17 +71,19 @@ export default function CreateTripScreen() {
   const [destSuggestions, setDestSuggestions] = useState<LocationSuggestion[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [startCoords, setStartCoords] = useState<{ latitude: number; longitude: number } | null>(
     existingTrip?.stops?.[0]?.location || null
   );
+  const [tripTitle, setTripTitle] = useState(existingTrip?.tripName || '');
 
   const totalSteps = 4;
 
   useEffect(() => {
-    if (destinations.length >= 2) {
+    if (destinations.length >= 1 && startCoords) {
       calculateRoute();
     }
-  }, [destinations, selectedMode]);
+  }, [destinations, selectedMode, startCoords]);
 
   const searchLocations = async (query: string, isStart: boolean) => {
     if (query.length < 3) {
@@ -150,8 +156,10 @@ export default function CreateTripScreen() {
         transport: selectedMode,
       });
 
-      if (response.data.route) {
+      if (response.data.route && response.data.route.length > 0) {
         setMapRoute(response.data.route);
+      } else {
+        setMapRoute(allPoints);
       }
     } catch (error) {
       console.error('Route calculation error:', error);
@@ -163,6 +171,66 @@ export default function CreateTripScreen() {
 
   const handleRecalculate = () => {
     calculateRoute();
+  };
+
+  const handleSaveTrip = async () => {
+    if (!startLocation || !startTime || destinations.length === 0 || !tripTitle) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const tripData = {
+        tripName: tripTitle,
+        date: startTime,
+        startLocation: startLocation,
+        startTime: startTime,
+        transport: selectedMode,
+        stops: [
+          {
+            id: 0,
+            name: startLocation,
+            location: startCoords,
+            status: 'upcoming',
+          },
+          ...destinations.map((dest, index) => ({
+            id: index + 1,
+            name: dest.name,
+            location: dest.location,
+            status: 'upcoming',
+          })),
+        ],
+        userId: user?.id || '',
+        destination: destinations[destinations.length - 1]?.name || startLocation,
+        isPublic: false,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Use the correct trip ID from existing trip or generate new one
+      const tripId = editMode && existingTrip?.id ? existingTrip.id : `trip_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const tripRef = doc(db, 'trips', tripId);
+      
+      if (editMode && existingTrip?.id) {
+        await updateDoc(tripRef, {
+          ...tripData,
+          updatedAt: new Date().toISOString(),
+        });
+      } else {
+        await setDoc(tripRef, {
+          ...tripData,
+          id: tripId,
+        });
+      }
+
+      Alert.alert('Success', editMode ? 'Trip updated successfully' : 'Trip created successfully');
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.error('Save trip error:', error);
+      Alert.alert('Error', `Failed to save trip: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -221,6 +289,20 @@ export default function CreateTripScreen() {
             <Text style={styles.stepDescription}>
               Tell us where and when you'd like to start
             </Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Trip Title</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="pencil" size={20} color="#5DA7DB" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter trip title"
+                  placeholderTextColor="#A0B4C8"
+                  value={tripTitle}
+                  onChangeText={setTripTitle}
+                />
+              </View>
+            </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Starting Location</Text>
@@ -419,10 +501,22 @@ export default function CreateTripScreen() {
               <Text style={styles.stepTitle}>Trip Preview</Text>
             </View>
             <Text style={styles.stepDescription}>
-              Review your trip before generating the smart plan
+              Review your trip before saving
             </Text>
 
             <View style={styles.previewCard}>
+              <View style={styles.previewRow}>
+                <Ionicons name="document-text" size={20} color="#5DA7DB" />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.previewLabel}>Trip Title</Text>
+                  <Text style={styles.previewValue}>
+                    {tripTitle || 'Not set'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.previewDivider} />
+
               <View style={styles.previewRow}>
                 <Ionicons name="location" size={20} color="#5DA7DB" />
                 <View style={{ flex: 1, marginLeft: 12 }}>
@@ -520,17 +614,27 @@ export default function CreateTripScreen() {
               </View>
             )}
 
-            <TouchableOpacity style={styles.generateButton}>
+            <TouchableOpacity 
+              style={styles.generateButton}
+              onPress={handleSaveTrip}
+              disabled={saving}
+            >
               <LinearGradient
                 colors={['#5DA7DB', '#0E2954']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.generateGradient}
               >
-                <Ionicons name="sparkles" size={24} color="#FFFFFF" />
-                <Text style={styles.generateText}>
-                  {editMode ? 'Save Changes' : 'Generate Smart Plan'}
-                </Text>
+                {saving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" />
+                    <Text style={styles.generateText}>
+                      {editMode ? 'Save Changes' : 'Save Trip'}
+                    </Text>
+                  </>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           </View>

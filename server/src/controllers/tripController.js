@@ -206,53 +206,6 @@ export const calculateTripDuration = async (req, res) => {
   }
 }
 
-export const calculateTripRoute = async (req, res) => {
-  try {
-    const { stops, transport = "driving" } = req.body
-    if (!stops || stops.length < 2) {
-      return res.status(400).json({ error: "At least 2 stops required" })
-    }
-    
-    const routePoints = []
-    let totalDuration = 0
-    let totalDistance = 0
-    
-    for (let i = 0; i < stops.length - 1; i++) {
-      const directions = await getDirections(
-        `${stops[i].latitude},${stops[i].longitude}`,
-        `${stops[i + 1].latitude},${stops[i + 1].longitude}`,
-        transport,
-      )
-      
-      if (directions.routes && directions.routes.length > 0) {
-        const route = directions.routes[0]
-        const leg = route.legs[0]
-        
-        totalDuration += leg.duration.value
-        totalDistance += leg.distance.value
-        
-        if (route.overview_polyline && route.overview_polyline.points) {
-          const decoded = decodePolyline(route.overview_polyline.points)
-          routePoints.push(...decoded)
-        }
-      }
-    }
-    
-    if (routePoints.length === 0) {
-      return res.json({ route: stops })
-    }
-    
-    res.json({
-      route: routePoints,
-      totalDuration: Math.ceil(totalDuration / 60),
-      totalDistance: Math.ceil(totalDistance / 1000),
-    })
-  } catch (error) {
-    console.error("Calculate Trip Route Error:", error.message)
-    res.status(500).json({ error: error.message })
-  }
-}
-
 function decodePolyline(encoded) {
   const points = []
   let index = 0
@@ -287,4 +240,67 @@ function decodePolyline(encoded) {
     })
   }
   return points
+}
+
+export const calculateTripRoute = async (req, res) => {
+  try {
+    const { stops, transport = "driving" } = req.body
+    
+    if (!stops || stops.length < 2) {
+      return res.status(400).json({ error: "At least 2 stops required" })
+    }
+    
+    const allRoutePoints = []
+    let totalDuration = 0
+    let totalDistance = 0
+    
+    for (let i = 0; i < stops.length - 1; i++) {
+      try {
+        const directions = await getDirections(
+          `${stops[i].latitude},${stops[i].longitude}`,
+          `${stops[i + 1].latitude},${stops[i + 1].longitude}`,
+          transport,
+        )
+        
+        if (directions.routes && directions.routes.length > 0) {
+          const route = directions.routes[0]
+          const leg = route.legs[0]
+          
+          totalDuration += leg.duration.value
+          totalDistance += leg.distance.value
+          
+          if (route.overview_polyline && route.overview_polyline.points) {
+            const decodedPoints = decodePolyline(route.overview_polyline.points)
+            allRoutePoints.push(...decodedPoints)
+          } else {
+            allRoutePoints.push(stops[i])
+            allRoutePoints.push(stops[i + 1])
+          }
+        } else {
+          allRoutePoints.push(stops[i])
+          allRoutePoints.push(stops[i + 1])
+        }
+      } catch (segmentError) {
+        console.error(`Error calculating segment ${i} to ${i + 1}:`, segmentError.message)
+        allRoutePoints.push(stops[i])
+        allRoutePoints.push(stops[i + 1])
+      }
+    }
+    
+    if (allRoutePoints.length === 0) {
+      return res.json({ route: stops })
+    }
+    
+    res.json({
+      route: allRoutePoints,
+      totalDuration: Math.ceil(totalDuration / 60),
+      totalDistance: Math.ceil(totalDistance / 1000),
+    })
+  } catch (error) {
+    console.error("Calculate Trip Route Error:", error.message)
+    res.status(500).json({ 
+      error: error.message,
+      route: req.body.stops || []
+    })
+  }
 }

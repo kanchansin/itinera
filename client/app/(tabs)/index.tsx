@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,70 +8,65 @@ import {
   StatusBar,
   StyleSheet,
   Dimensions,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Polyline, Marker } from 'react-native-maps';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
+import { db } from '@/services/firebase';
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 
 const { width } = Dimensions.get('window');
-
-const mockTripData = {
-  tripName: 'Bangalore Weekend',
-  date: 'Nov 16-17, 2024',
-  currentStop: 2,
-  stops: [
-    {
-      id: 1,
-      name: 'Lalbagh Botanical Garden',
-      arrival: '09:00 AM',
-      departure: '11:30 AM',
-      description: 'Explore the historic gardens and glass house',
-      status: 'completed',
-      location: { latitude: 12.9507, longitude: 77.5847 },
-    },
-    {
-      id: 2,
-      name: 'VV Puram Food Street',
-      arrival: '12:00 PM',
-      departure: '02:00 PM',
-      description: 'Lunch at authentic South Indian street food',
-      status: 'current',
-      location: { latitude: 12.9352, longitude: 77.5740 },
-    },
-    {
-      id: 3,
-      name: 'Cubbon Park',
-      arrival: '03:00 PM',
-      departure: '05:00 PM',
-      description: 'Relaxing walk through the green oasis',
-      status: 'upcoming',
-      location: { latitude: 12.9762, longitude: 77.5929 },
-    },
-    {
-      id: 4,
-      name: 'UB City Mall',
-      arrival: '06:00 PM',
-      departure: '08:30 PM',
-      description: 'Shopping and dinner at luxury mall',
-      status: 'upcoming',
-      location: { latitude: 12.9716, longitude: 77.5946 },
-    },
-  ],
-};
-
-const mapRoute = [
-  { latitude: 12.9507, longitude: 77.5847 },
-  { latitude: 12.9352, longitude: 77.5740 },
-  { latitude: 12.9762, longitude: 77.5929 },
-  { latitude: 12.9716, longitude: 77.5946 },
-];
 
 export default function HomeScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const [currentTrip] = useState(mockTripData);
+  const [currentTrip, setCurrentTrip] = useState<any>(null);
+  const [mapRoute, setMapRoute] = useState<Array<{ latitude: number; longitude: number }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    loadTrips();
+  }, [user]);
+
+  const loadTrips = async () => {
+    if (!user?.id) return;
+
+    try {
+      const tripsRef = collection(db, 'trips');
+      const q = query(
+        tripsRef,
+        where('userId', '==', user.id),
+        orderBy('createdAt', 'desc')
+      );
+
+      const snapshot = await getDocs(q);
+      
+      if (!snapshot.empty) {
+        const tripData = snapshot.docs[0].data();
+        setCurrentTrip(tripData);
+        
+        if (tripData.stops && tripData.stops.length > 0) {
+          const routePoints = tripData.stops.map((stop: any) => stop.location);
+          setMapRoute(routePoints);
+        }
+      }
+    } catch (error) {
+      console.error('Load trips error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadTrips();
+    setRefreshing(false);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -86,28 +81,82 @@ export default function HomeScreen() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'checkmark-circle';
-      case 'current':
-        return 'radio-button-on';
-      case 'upcoming':
-        return 'ellipse-outline';
-      default:
-        return 'ellipse-outline';
-    }
-  };
-
   const handleEditTrip = () => {
+    if (!currentTrip) return;
+    
     router.push({
       pathname: '/(tabs)/create-trip',
       params: {
         editMode: 'true',
-        tripData: JSON.stringify(currentTrip),
+        tripData: JSON.stringify({
+          id: currentTrip.id,
+          tripName: currentTrip.tripName,
+          startLocation: currentTrip.startLocation,
+          startTime: currentTrip.startTime,
+          transport: currentTrip.transport,
+          stops: currentTrip.stops || [],
+        }),
       },
     });
   };
+
+  if (loading) {
+    return (
+      <LinearGradient colors={['#FFFFFF', '#E8F1F8']} style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#5DA7DB" />
+          <Text style={styles.loadingText}>Loading your trips...</Text>
+        </View>
+      </LinearGradient>
+    );
+  }
+
+  if (!currentTrip) {
+    return (
+      <LinearGradient colors={['#FFFFFF', '#E8F1F8']} style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTitle}>My Trips</Text>
+            <Text style={styles.headerDate}>No active trips</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={() => router.push('/(tabs)/profile')}
+          >
+            <Image
+              source={require('../../assets/profile.jpg')}
+              style={styles.profileImage}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.emptyStateContainer}>
+          <Ionicons name="map-outline" size={80} color="#E8F1F8" />
+          <Text style={styles.emptyStateTitle}>No Trips Yet</Text>
+          <Text style={styles.emptyStateText}>
+            Create your first trip to start exploring
+          </Text>
+          <TouchableOpacity
+            style={styles.createTripButton}
+            onPress={() => router.push('/(tabs)/create-trip')}
+          >
+            <LinearGradient
+              colors={['#5DA7DB', '#0E2954']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.createTripGradient}
+            >
+              <Ionicons name="add-circle" size={24} color="#FFFFFF" />
+              <Text style={styles.createTripText}>Create Trip</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+    );
+  }
 
   return (
     <LinearGradient colors={['#FFFFFF', '#E8F1F8']} style={styles.container}>
@@ -115,8 +164,8 @@ export default function HomeScreen() {
 
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>My Trip</Text>
-          <Text style={styles.headerDate}>{currentTrip.date}</Text>
+          <Text style={styles.headerTitle}>{currentTrip.tripName}</Text>
+          <Text style={styles.headerDate}>{currentTrip.date || currentTrip.startTime}</Text>
         </View>
         <TouchableOpacity 
           style={styles.profileButton}
@@ -133,14 +182,17 @@ export default function HomeScreen() {
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         <View style={styles.mapCard}>
           <View style={styles.mapContainer}>
             <MapView
               style={styles.map}
               initialRegion={{
-                latitude: 12.9507,
-                longitude: 77.5847,
+                latitude: currentTrip.stops[0]?.location?.latitude || 12.9716,
+                longitude: currentTrip.stops[0]?.location?.longitude || 77.5946,
                 latitudeDelta: 0.1,
                 longitudeDelta: 0.1,
               }}
@@ -149,16 +201,25 @@ export default function HomeScreen() {
               rotateEnabled={false}
               pitchEnabled={false}
             >
-              <Polyline
-                coordinates={mapRoute}
-                strokeColor="#5DA7DB"
-                strokeWidth={3}
-              />
-              {currentTrip.stops.map((stop) => (
+              {mapRoute.length > 0 && (
+                <Polyline
+                  coordinates={mapRoute}
+                  strokeColor="#5DA7DB"
+                  strokeWidth={3}
+                />
+              )}
+              {currentTrip.stops && currentTrip.stops.map((stop: any, index: number) => (
                 <Marker
                   key={stop.id}
                   coordinate={stop.location}
-                  pinColor={getStatusColor(stop.status)}
+                  pinColor={
+                    index === 0 
+                      ? '#22c55e' 
+                      : index === currentTrip.stops.length - 1 
+                        ? '#FF6B6B' 
+                        : '#5DA7DB'
+                  }
+                  title={stop.name}
                 />
               ))}
             </MapView>
@@ -171,16 +232,14 @@ export default function HomeScreen() {
             <View style={styles.mapInfoItem}>
               <Ionicons name="location" size={16} color="#5DA7DB" />
               <Text style={styles.mapInfoText}>
-                {currentTrip.stops.length} Stops
+                {currentTrip.stops?.length || 0} Stops
               </Text>
             </View>
             <View style={styles.mapInfoItem}>
-              <Ionicons name="time" size={16} color="#5DA7DB" />
-              <Text style={styles.mapInfoText}>~8 Hours</Text>
-            </View>
-            <View style={styles.mapInfoItem}>
-              <Ionicons name="navigate" size={16} color="#5DA7DB" />
-              <Text style={styles.mapInfoText}>32 km</Text>
+              <Ionicons name="car-sport" size={16} color="#5DA7DB" />
+              <Text style={styles.mapInfoText}>
+                {currentTrip.transport || 'driving'}
+              </Text>
             </View>
           </View>
         </View>
@@ -188,13 +247,13 @@ export default function HomeScreen() {
         <View style={styles.timelineSection}>
           <Text style={styles.sectionTitle}>Trip Timeline</Text>
           <View style={styles.timeline}>
-            {currentTrip.stops.map((stop, index) => (
+            {currentTrip.stops && currentTrip.stops.map((stop: any, index: number) => (
               <View key={stop.id} style={styles.timelineItemContainer}>
                 {index > 0 && (
                   <View
                     style={[
                       styles.timelineLine,
-                      { backgroundColor: getStatusColor(stop.status) },
+                      { backgroundColor: getStatusColor(stop.status || 'upcoming') },
                     ]}
                   />
                 )}
@@ -215,7 +274,7 @@ export default function HomeScreen() {
                   <View
                     style={[
                       styles.stopIconContainer,
-                      { backgroundColor: getStatusColor(stop.status) },
+                      { backgroundColor: getStatusColor(stop.status || 'upcoming') },
                     ]}
                   >
                     {stop.status === 'completed' ? (
@@ -239,20 +298,24 @@ export default function HomeScreen() {
                         </View>
                       )}
                     </View>
-                    <Text style={styles.stopDescription}>
-                      {stop.description}
-                    </Text>
-                    <View style={styles.stopTime}>
-                      <View style={styles.timeBlock}>
-                        <Ionicons name="log-in" size={14} color="#5DA7DB" />
-                        <Text style={styles.timeText}>{stop.arrival}</Text>
+                    {stop.description && (
+                      <Text style={styles.stopDescription}>
+                        {stop.description}
+                      </Text>
+                    )}
+                    {stop.arrival && stop.departure && (
+                      <View style={styles.stopTime}>
+                        <View style={styles.timeBlock}>
+                          <Ionicons name="log-in" size={14} color="#5DA7DB" />
+                          <Text style={styles.timeText}>{stop.arrival}</Text>
+                        </View>
+                        <Ionicons name="arrow-forward" size={14} color="#A0B4C8" />
+                        <View style={styles.timeBlock}>
+                          <Ionicons name="log-out" size={14} color="#5DA7DB" />
+                          <Text style={styles.timeText}>{stop.departure}</Text>
+                        </View>
                       </View>
-                      <Ionicons name="arrow-forward" size={14} color="#A0B4C8" />
-                      <View style={styles.timeBlock}>
-                        <Ionicons name="log-out" size={14} color="#5DA7DB" />
-                        <Text style={styles.timeText}>{stop.departure}</Text>
-                      </View>
-                    </View>
+                    )}
                   </View>
                 </View>
               </View>
@@ -268,7 +331,7 @@ export default function HomeScreen() {
                 <Ionicons name="checkmark-done" size={20} color="#22c55e" />
               </View>
               <Text style={styles.summaryValue}>
-                {currentTrip.stops.filter((s) => s.status === 'completed').length}
+                {currentTrip.stops?.filter((s: any) => s.status === 'completed').length || 0}
               </Text>
               <Text style={styles.summaryLabel}>Completed</Text>
             </View>
@@ -278,26 +341,29 @@ export default function HomeScreen() {
                 <Ionicons name="time" size={20} color="#5DA7DB" />
               </View>
               <Text style={styles.summaryValue}>
-                {currentTrip.stops.filter((s) => s.status === 'upcoming').length}
+                {currentTrip.stops?.filter((s: any) => s.status === 'upcoming').length || currentTrip.stops?.length || 0}
               </Text>
               <Text style={styles.summaryLabel}>Remaining</Text>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryItem}>
               <View style={styles.summaryIcon}>
-                <Ionicons name="speedometer" size={20} color="#FFB800" />
+                <Ionicons name="location" size={20} color="#FFB800" />
               </View>
-              <Text style={styles.summaryValue}>75%</Text>
-              <Text style={styles.summaryLabel}>Progress</Text>
+              <Text style={styles.summaryValue}>{currentTrip.stops?.length || 0}</Text>
+              <Text style={styles.summaryLabel}>Total Stops</Text>
             </View>
           </View>
         </View>
       </ScrollView>
 
       <View style={styles.fabContainer}>
-        <TouchableOpacity style={styles.fabSecondary}>
+        <TouchableOpacity 
+          style={styles.fabSecondary}
+          onPress={onRefresh}
+        >
           <Ionicons name="refresh" size={24} color="#5DA7DB" />
-          <Text style={styles.fabSecondaryText}>Recalculate</Text>
+          <Text style={styles.fabSecondaryText}>Refresh</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.fabPrimary} onPress={handleEditTrip}>
           <LinearGradient
@@ -318,6 +384,58 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#5DA7DB',
+    marginTop: 16,
+    fontWeight: '600',
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyStateTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0E2954',
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#A0B4C8',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  createTripButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#5DA7DB',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  createTripGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    gap: 8,
+  },
+  createTripText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
