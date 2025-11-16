@@ -1,9 +1,7 @@
-// client/app/(tabs)/profile.tsx
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Alert,
   Image,
@@ -13,117 +11,90 @@ import {
   TouchableOpacity,
   View,
   StatusBar,
+  Dimensions,
+  RefreshControl,
 } from 'react-native';
+import { db } from '@/services/firebase';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 
-const myTrips = [
-  {
-    id: 1,
-    destination: 'Coorg, Karnataka',
-    image: 'https://images.unsplash.com/photo-1587241321921-91eed3df0d29?w=400',
-    date: 'Nov 10-12',
-    status: 'completed',
-  },
-  {
-    id: 2,
-    destination: 'Hampi, Karnataka',
-    image: 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=400',
-    date: 'Oct 28-30',
-    status: 'completed',
-  },
-  {
-    id: 3,
-    destination: 'Gokarna Beach',
-    image: 'https://images.unsplash.com/photo-1596895111956-bf1cf0599ce5?w=400',
-    date: 'Dec 5-7',
-    status: 'upcoming',
-  },
-];
-
-const achievements = [
-  {
-    id: 1,
-    icon: 'airplane',
-    title: 'Explorer',
-    description: 'Completed 10+ trips',
-    color: '#5DA7DB',
-    unlocked: true,
-  },
-  {
-    id: 2,
-    icon: 'heart',
-    title: 'Community Star',
-    description: 'Shared 5 trip guides',
-    color: '#FF6B6B',
-    unlocked: true,
-  },
-  {
-    id: 3,
-    icon: 'compass',
-    title: 'Adventurer',
-    description: 'Visit 20 destinations',
-    color: '#FFB800',
-    unlocked: false,
-  },
-  {
-    id: 4,
-    icon: 'camera',
-    title: 'Photographer',
-    description: 'Upload 50 photos',
-    color: '#A855F7',
-    unlocked: false,
-  },
-];
-
-const settingsItems = [
-  {
-    id: 1,
-    icon: 'notifications',
-    label: 'Notifications',
-    subtitle: 'Push, Email, SMS',
-    action: 'notifications',
-  },
-  {
-    id: 2,
-    icon: 'lock-closed',
-    label: 'Privacy',
-    subtitle: 'Data & Security',
-    action: 'privacy',
-  },
-  {
-    id: 3,
-    icon: 'help-circle',
-    label: 'Help & Support',
-    subtitle: 'FAQs, Contact Us',
-    action: 'help',
-  },
-  {
-    id: 4,
-    icon: 'information-circle',
-    label: 'About',
-    subtitle: 'Version 1.0.0',
-    action: 'about',
-  },
-];
+const { width } = Dimensions.get('window');
+const GRID_ITEM_SIZE = (width - 6) / 3;
 
 export default function ProfileScreen() {
   const { logout, user } = useAuth();
   const router = useRouter();
+  const [userData, setUserData] = useState<any>(null);
+  const [guides, setGuides] = useState<any[]>([]);
+  const [followers, setFollowers] = useState(0);
+  const [following, setFollowing] = useState(0);
+  const [selectedTab, setSelectedTab] = useState('guides');
+  const [refreshing, setRefreshing] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
 
-  const userData = user
-    ? {
-        name: user.name,
-        email: user.email,
-        totalTrips: 12,
-        sharedGuides: 4,
-        savedPlaces: 28,
-      }
-    : {
-        name: 'User',
-        email: 'user@example.com',
-        totalTrips: 0,
-        sharedGuides: 0,
-        savedPlaces: 0,
-      };
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const userDocRef = doc(db, 'users', user?.id || '');
+      const userDoc = await getDoc(userDocRef);
+      const data = userDoc.data();
+      setUserData(data);
+      setIsPrivate(data?.isPrivate || false);
+
+      const followersQuery = query(
+        collection(db, 'followers'),
+        where('followingId', '==', user?.id)
+      );
+      const followersSnapshot = await getDocs(followersQuery);
+      setFollowers(followersSnapshot.docs.length);
+
+      const followingQuery = query(
+        collection(db, 'followers'),
+        where('followerId', '==', user?.id)
+      );
+      const followingSnapshot = await getDocs(followingQuery);
+      setFollowing(followingSnapshot.docs.length);
+
+      const guidesQuery = query(
+        collection(db, 'trips'),
+        where('userId', '==', user?.id),
+        where('isPublic', '==', true),
+        orderBy('createdAt', 'desc')
+      );
+      const guidesSnapshot = await getDocs(guidesQuery);
+
+      const guidesData = guidesSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setGuides(guidesData);
+    } catch (error) {
+      console.error('Load user data error:', error);
+    }
+  };
+
+  const togglePrivacy = async () => {
+    try {
+      const newPrivacy = !isPrivate;
+      const userDocRef = doc(db, 'users', user?.id || '');
+
+      await updateDoc(userDocRef, {
+        isPrivate: newPrivacy,
+        updatedAt: new Date().toISOString(),
+      });
+
+      setIsPrivate(newPrivacy);
+      Alert.alert(
+        'Privacy Updated',
+        newPrivacy ? 'Your account is now private' : 'Your account is now public'
+      );
+    } catch (error) {
+      console.error('Toggle privacy error:', error);
+      Alert.alert('Error', 'Failed to update privacy settings');
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -139,175 +110,140 @@ export default function ProfileScreen() {
     ]);
   };
 
-  const handleSettingPress = (action: string) => {
-    console.log('Setting pressed:', action);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadUserData();
+    setRefreshing(false);
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F7FAFC" />
-      
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 32 }}
-      >
-        {/* Header Section */}
-        <LinearGradient
-          colors={['#E8F1F8', '#F7FAFC']}
-          style={styles.headerGradient}
-        >
-          <View style={styles.profileHeader}>
-            <View style={styles.profileImageContainer}>
-              <Image
-                source={require('../../assets/profile.jpg')}
-                style={styles.profileImage}
-              />
-              <View style={styles.onlineBadge} />
-            </View>
-            <Text style={styles.profileName}>{userData.name}</Text>
-            <Text style={styles.profileEmail}>{userData.email}</Text>
-            <TouchableOpacity style={styles.editButton}>
-              <Ionicons name="create-outline" size={18} color="#5DA7DB" />
-              <Text style={styles.editButtonText}>Edit Profile</Text>
-            </TouchableOpacity>
-          </View>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-          {/* Stats Row */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{userData.totalTrips}</Text>
-              <Text style={styles.statLabel}>Trips</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{userData.sharedGuides}</Text>
-              <Text style={styles.statLabel}>Shared</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{userData.savedPlaces}</Text>
-              <Text style={styles.statLabel}>Saved</Text>
-            </View>
-          </View>
-        </LinearGradient>
-
-        {/* My Trips Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>My Trips</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tripsScroll}
-          >
-            {myTrips.map((trip) => (
-              <TouchableOpacity key={trip.id} style={styles.tripCard}>
-                <Image source={{ uri: trip.image }} style={styles.tripImage} />
-                <LinearGradient
-                  colors={['transparent', 'rgba(14, 41, 84, 0.8)']}
-                  style={styles.tripGradient}
-                />
-                {trip.status === 'upcoming' && (
-                  <View style={styles.upcomingBadge}>
-                    <Ionicons name="calendar" size={12} color="#FFFFFF" />
-                    <Text style={styles.upcomingText}>Upcoming</Text>
-                  </View>
-                )}
-                <View style={styles.tripInfo}>
-                  <Text style={styles.tripDestination}>{trip.destination}</Text>
-                  <Text style={styles.tripDate}>{trip.date}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Achievements Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Achievements</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>View All</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.achievementsGrid}>
-            {achievements.map((achievement) => (
-              <View
-                key={achievement.id}
-                style={[
-                  styles.achievementCard,
-                  !achievement.unlocked && styles.achievementLocked,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.achievementIcon,
-                    { backgroundColor: achievement.unlocked ? achievement.color : '#E8F1F8' },
-                  ]}
-                >
-                  <Ionicons
-                    name={achievement.icon as any}
-                    size={24}
-                    color={achievement.unlocked ? '#FFFFFF' : '#A0B4C8'}
-                  />
-                </View>
-                <Text
-                  style={[
-                    styles.achievementTitle,
-                    !achievement.unlocked && styles.achievementTitleLocked,
-                  ]}
-                >
-                  {achievement.title}
-                </Text>
-                <Text style={styles.achievementDescription}>
-                  {achievement.description}
-                </Text>
-                {achievement.unlocked && (
-                  <View style={styles.unlockedBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
-                  </View>
-                )}
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Settings Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Settings</Text>
-          <View style={styles.settingsList}>
-            {settingsItems.map((item, index) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.settingItem,
-                  index === settingsItems.length - 1 && styles.settingItemLast,
-                ]}
-                onPress={() => handleSettingPress(item.action)}
-              >
-                <View style={styles.settingIconContainer}>
-                  <Ionicons name={item.icon as any} size={22} color="#5DA7DB" />
-                </View>
-                <View style={styles.settingContent}>
-                  <Text style={styles.settingLabel}>{item.label}</Text>
-                  <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#A0B4C8" />
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
-          <Text style={styles.logoutText}>Logout</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={togglePrivacy}>
+          <Ionicons
+            name={isPrivate ? 'lock-closed' : 'lock-open'}
+            size={24}
+            color="#0E2954"
+          />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>{userData?.name || 'Profile'}</Text>
+        <TouchableOpacity onPress={handleLogout}>
+          <Ionicons name="menu" size={28} color="#0E2954" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        <View style={styles.profileSection}>
+          <View style={styles.profileHeader}>
+            <View style={styles.avatarContainer}>
+              {userData?.profilePicture ? (
+                <Image source={{ uri: userData.profilePicture }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                  <Ionicons name="person" size={48} color="#A0B4C8" />
+                </View>
+              )}
+            </View>
+
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{guides.length}</Text>
+                <Text style={styles.statLabel}>Guides</Text>
+              </View>
+              <TouchableOpacity style={styles.statItem}>
+                <Text style={styles.statValue}>{followers}</Text>
+                <Text style={styles.statLabel}>Followers</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.statItem}>
+                <Text style={styles.statValue}>{following}</Text>
+                <Text style={styles.statLabel}>Following</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>{userData?.name || 'User'}</Text>
+            {userData?.bio && <Text style={styles.profileBio}>{userData.bio}</Text>}
+          </View>
+
+          <TouchableOpacity style={styles.editButton}>
+            <Text style={styles.editButtonText}>Edit Profile</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            style={[styles.tab, selectedTab === 'guides' && styles.tabActive]}
+            onPress={() => setSelectedTab('guides')}
+          >
+            <Ionicons
+              name="grid"
+              size={24}
+              color={selectedTab === 'guides' ? '#0E2954' : '#A0B4C8'}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, selectedTab === 'saved' && styles.tabActive]}
+            onPress={() => setSelectedTab('saved')}
+          >
+            <Ionicons
+              name="bookmark"
+              size={24}
+              color={selectedTab === 'saved' ? '#0E2954' : '#A0B4C8'}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {selectedTab === 'guides' && (
+          <View style={styles.gridContainer}>
+            {guides.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="images-outline" size={80} color="#E8F1F8" />
+                <Text style={styles.emptyTitle}>No Guides Yet</Text>
+                <Text style={styles.emptySubtitle}>
+                  Share your travel experiences with the community
+                </Text>
+              </View>
+            ) : (
+              guides.map((guide) => (
+                <TouchableOpacity key={guide.id} style={styles.gridItem}>
+                  <Image
+                    source={{
+                      uri:
+                        guide.coverImage ||
+                        'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
+                    }}
+                    style={styles.gridImage}
+                  />
+                  <View style={styles.gridOverlay}>
+                    <View style={styles.gridStats}>
+                      <View style={styles.gridStat}>
+                        <Ionicons name="heart" size={16} color="#FFFFFF" />
+                        <Text style={styles.gridStatText}>{guide.likesCount || 0}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        )}
+
+        {selectedTab === 'saved' && (
+          <View style={styles.emptyState}>
+            <Ionicons name="bookmark-outline" size={80} color="#E8F1F8" />
+            <Text style={styles.emptyTitle}>No Saved Guides</Text>
+            <Text style={styles.emptySubtitle}>Save guides to view them later</Text>
+          </View>
+        )}
+
+        <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
@@ -316,297 +252,164 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7FAFC',
+    backgroundColor: '#FFFFFF',
   },
-  scrollView: {
-    flex: 1,
-  },
-  headerGradient: {
-    paddingTop: 48,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-  },
-  profileHeader: {
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: 48,
     paddingHorizontal: 20,
+    paddingBottom: 16,
   },
-  profileImageContainer: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 4,
-    borderColor: '#FFFFFF',
-  },
-  onlineBadge: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#22c55e',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-  },
-  profileName: {
-    fontSize: 28,
+  headerTitle: {
+    fontSize: 20,
     fontWeight: '700',
     color: '#0E2954',
-    marginBottom: 4,
   },
-  profileEmail: {
-    fontSize: 14,
-    color: '#5DA7DB',
-    marginBottom: 16,
+  content: {
+    flex: 1,
   },
-  editButton: {
+  profileSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: '#5DA7DB',
-    backgroundColor: '#FFFFFF',
-    gap: 6,
+    marginBottom: 16,
   },
-  editButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#5DA7DB',
+  avatarContainer: {
+    marginRight: 24,
+  },
+  avatar: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+  },
+  avatarPlaceholder: {
+    backgroundColor: '#F5F9FC',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   statsContainer: {
+    flex: 1,
     flexDirection: 'row',
-    marginTop: 24,
-    marginHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#0E2954',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    justifyContent: 'space-around',
   },
   statItem: {
-    flex: 1,
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: '700',
     color: '#0E2954',
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#A0B4C8',
-    fontWeight: '500',
   },
-  statDivider: {
-    width: 1,
-    backgroundColor: '#E8F1F8',
-    marginHorizontal: 16,
-  },
-  section: {
-    marginTop: 24,
-    paddingHorizontal: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  profileInfo: {
     marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 22,
+  profileName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0E2954',
+    marginBottom: 4,
+  },
+  profileBio: {
+    fontSize: 14,
+    color: '#0E2954',
+    lineHeight: 20,
+  },
+  editButton: {
+    backgroundColor: '#F5F9FC',
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E8F1F8',
+  },
+  editButtonText: {
+    fontSize: 14,
     fontWeight: '700',
     color: '#0E2954',
   },
-  seeAllText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#5DA7DB',
-  },
-  tripsScroll: {
-    gap: 16,
-  },
-  tripCard: {
-    width: 180,
-    height: 240,
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#0E2954',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  tripImage: {
-    width: '100%',
-    height: '100%',
-    position: 'absolute',
-  },
-  tripGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-  },
-  upcomingBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
+  tabsContainer: {
     flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#E8F1F8',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: '#5DA7DB',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 24,
-    gap: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'transparent',
   },
-  upcomingText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  tabActive: {
+    borderBottomColor: '#0E2954',
   },
-  tripInfo: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 16,
-  },
-  tripDestination: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  tripDate: {
-    fontSize: 12,
-    color: '#E8F1F8',
-  },
-  achievementsGrid: {
+  gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 3,
   },
-  achievementCard: {
-    width: '48%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    shadowColor: '#0E2954',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+  gridItem: {
+    width: GRID_ITEM_SIZE,
+    height: GRID_ITEM_SIZE,
     position: 'relative',
   },
-  achievementLocked: {
-    opacity: 0.6,
+  gridImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F5F9FC',
   },
-  achievementIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  gridOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    opacity: 0,
   },
-  achievementTitle: {
+  gridStats: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  gridStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  gridStatText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0E2954',
-    marginBottom: 4,
-    textAlign: 'center',
+    color: '#FFFFFF',
   },
-  achievementTitleLocked: {
-    color: '#A0B4C8',
-  },
-  achievementDescription: {
-    fontSize: 11,
-    color: '#A0B4C8',
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  unlockedBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
-  settingsList: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#0E2954',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F5F9FC',
-  },
-  settingItemLast: {
-    borderBottomWidth: 0,
-  },
-  settingIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#EBF5FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  settingContent: {
-    flex: 1,
-  },
-  settingLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0E2954',
-    marginBottom: 2,
-  },
-  settingSubtitle: {
-    fontSize: 12,
-    color: '#A0B4C8',
-  },
-  logoutButton: {
-    flexDirection: 'row',
+  emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 20,
-    marginTop: 24,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    gap: 8,
-    borderWidth: 2,
-    borderColor: '#FFE8E8',
-    shadowColor: '#FF6B6B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 2,
+    paddingVertical: 80,
+    paddingHorizontal: 40,
+    width: '100%',
   },
-  logoutText: {
-    fontSize: 16,
+  emptyTitle: {
+    fontSize: 20,
     fontWeight: '700',
-    color: '#FF6B6B',
+    color: '#0E2954',
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#A0B4C8',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

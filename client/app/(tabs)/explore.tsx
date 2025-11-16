@@ -1,231 +1,280 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  ScrollView, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  TextInput,
+  ScrollView,
+  TouchableOpacity,
   Image,
-  Dimensions,
   StatusBar,
-  StyleSheet
+  StyleSheet,
+  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import axios from 'axios';
 
 const { width } = Dimensions.get('window');
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:5000/api';
 
-// Mock data for trips
-const featuredTrips = [
+const popularDestinations = [
   {
     id: 1,
-    title: 'Mysore Heritage Tour',
-    location: 'Mysore, Karnataka',
-    duration: '2 Days',
-    rating: 4.8,
-    image: 'https://images.unsplash.com/photo-1609920658906-8223bd289001?w=800',
-    tags: ['Heritage', 'Solo']
+    name: 'Coorg, Karnataka',
+    image: 'https://images.unsplash.com/photo-1587241321921-91eed3df0d29?w=800',
+    description: 'Coffee plantations and misty hills',
   },
   {
     id: 2,
-    title: 'Coorg Coffee Trail',
-    location: 'Coorg, Karnataka',
-    duration: '3 Days',
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1587241321921-91eed3df0d29?w=800',
-    tags: ['Nature', 'Family']
+    name: 'Hampi, Karnataka',
+    image: 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=800',
+    description: 'Ancient ruins and temples',
   },
   {
     id: 3,
-    title: 'Gokarna Beach Retreat',
-    location: 'Gokarna, Karnataka',
-    duration: '2 Days',
-    rating: 4.7,
+    name: 'Gokarna, Karnataka',
     image: 'https://images.unsplash.com/photo-1596895111956-bf1cf0599ce5?w=800',
-    tags: ['Beach', 'Romantic']
-  }
-];
-
-const communityTrips = [
-  {
-    id: 4,
-    title: 'Weekend in Chikmagalur',
-    location: 'Chikmagalur, Karnataka',
-    duration: '2 Days',
-    rating: 4.6,
-    image: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800',
-    tags: ['Weekend', 'Adventure'],
-    author: 'Priya M.'
+    description: 'Pristine beaches and spiritual vibes',
   },
-  {
-    id: 5,
-    title: 'Hampi Ancient Wonders',
-    location: 'Hampi, Karnataka',
-    duration: '3 Days',
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=800',
-    tags: ['History', 'Solo'],
-    author: 'Rahul K.'
-  },
-  {
-    id: 6,
-    title: 'Wayanad Nature Escape',
-    location: 'Wayanad, Kerala',
-    duration: '4 Days',
-    rating: 4.8,
-    image: 'https://images.unsplash.com/photo-1506012787146-f92b2d7d6d96?w=800',
-    tags: ['Nature', 'Family'],
-    author: 'Anjali S.'
-  }
 ];
-
-const filterOptions = ['All Trips', '2-Day Trips', 'Adventure', 'Weekend Getaway', 'Family', 'Solo'];
 
 export default function ExploreScreen() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('All Trips');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [aiSuggestions, setAiSuggestions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+
+  const categories = ['all', 'nature', 'adventure', 'cultural', 'beach', 'mountains'];
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/destinations/search`, {
+        params: { query: searchQuery },
+      });
+
+      const results = [
+        ...(response.data.database || []),
+        ...(response.data.external || []).map((place: any) => ({
+          id: place.place_id,
+          name: place.name,
+          latitude: place.geometry?.location?.lat,
+          longitude: place.geometry?.location?.lng,
+          description: place.formatted_address,
+          rating: place.rating,
+          isExternal: true,
+        })),
+      ];
+
+      setSearchResults(results);
+
+      await getAISuggestions(searchQuery);
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchResults([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getAISuggestions = async (destination: string) => {
+    try {
+      const response = await axios.post(`${API_URL}/ai/generate-summary`, {
+        title: `Trip to ${destination}`,
+        destination: destination,
+        stops: [],
+        duration: 0,
+        transport: 'car',
+      });
+
+      setAiSuggestions([
+        {
+          type: 'summary',
+          content: response.data.summary,
+        },
+      ]);
+    } catch (error) {
+      console.error('AI suggestions error:', error);
+    }
+  };
+
+  const estimateDuration = async (placeName: string) => {
+    try {
+      const response = await axios.post(`${API_URL}/ai/estimate-duration`, {
+        placeName: placeName,
+        reviews: [],
+      });
+
+      return response.data.duration;
+    } catch (error) {
+      console.error('Estimate duration error:', error);
+      return 60;
+    }
+  };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
-      {/* Header */}
+
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Explore</Text>
-        <Text style={styles.headerSubtitle}>
-          Discover amazing trips from our community
-        </Text>
+        <Text style={styles.headerSubtitle}>Discover new destinations with AI</Text>
+      </View>
 
-        {/* Search Bar */}
+      <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#5DA7DB" style={{ marginRight: 12 }} />
+          <Ionicons name="search" size={20} color="#5DA7DB" />
           <TextInput
-            placeholder="Search destinations, trips..."
+            style={styles.searchInput}
+            placeholder="Where do you want to go?"
             placeholderTextColor="#A0B4C8"
             value={searchQuery}
             onChangeText={setSearchQuery}
-            style={styles.searchInput}
+            onSubmitEditing={handleSearch}
+            returnKeyType="search"
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color="#A0B4C8" />
+            </TouchableOpacity>
+          )}
         </View>
+        <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+          <Ionicons name="sparkles" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
-        style={{ flex: 1 }}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoriesContainer}
       >
-        {/* Filter Chips */}
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContainer}
-        >
-          {filterOptions.map((filter) => (
-            <TouchableOpacity
-              key={filter}
-              onPress={() => setSelectedFilter(filter)}
+        {categories.map((category) => (
+          <TouchableOpacity
+            key={category}
+            style={[
+              styles.categoryChip,
+              selectedCategory === category && styles.categoryChipActive,
+            ]}
+            onPress={() => setSelectedCategory(category)}
+          >
+            <Text
               style={[
-                styles.filterChip,
-                selectedFilter === filter && styles.filterChipActive
+                styles.categoryText,
+                selectedCategory === category && styles.categoryTextActive,
               ]}
             >
-              <Text style={[
-                styles.filterText,
-                selectedFilter === filter && styles.filterTextActive
-              ]}>
-                {filter}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+              {category.charAt(0).toUpperCase() + category.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
-        {/* Featured Trips Carousel */}
-        <View style={{ marginBottom: 32 }}>
-          <Text style={styles.sectionTitle}>Featured Trips</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.carouselContainer}
-            snapToInterval={width - 80}
-            decelerationRate="fast"
-          >
-            {featuredTrips.map((trip) => (
-              <TouchableOpacity
-                key={trip.id}
-                style={styles.featuredCard}
-              >
-                <Image
-                  source={{ uri: trip.image }}
-                  style={StyleSheet.absoluteFill}
-                />
-                <LinearGradient
-                  colors={['transparent', 'rgba(14, 41, 84, 0.9)']}
-                  style={styles.cardGradient}
-                />
-                <View style={styles.cardContent}>
-                  <View style={styles.tagsContainer}>
-                    {trip.tags.map((tag) => (
-                      <View key={tag} style={styles.tag}>
-                        <Text style={styles.tagText}>{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
-                  <Text style={styles.cardTitle}>{trip.title}</Text>
-                  <View style={styles.cardFooter}>
-                    <Text style={styles.cardLocation}>
-                      {trip.location} • {trip.duration}
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#5DA7DB" />
+            <Text style={styles.loadingText}>Finding amazing places...</Text>
+          </View>
+        )}
+
+        {aiSuggestions.length > 0 && !loading && (
+          <View style={styles.aiSuggestionsCard}>
+            <View style={styles.aiHeader}>
+              <Ionicons name="sparkles" size={24} color="#5DA7DB" />
+              <Text style={styles.aiTitle}>AI Recommendations</Text>
+            </View>
+            <Text style={styles.aiContent}>{aiSuggestions[0].content}</Text>
+          </View>
+        )}
+
+        {searchResults.length > 0 && !loading && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Search Results</Text>
+            {searchResults.map((result) => (
+              <TouchableOpacity key={result.id} style={styles.resultCard}>
+                <View style={styles.resultIcon}>
+                  <Ionicons name="location" size={24} color="#5DA7DB" />
+                </View>
+                <View style={styles.resultContent}>
+                  <Text style={styles.resultName}>{result.name}</Text>
+                  {result.description && (
+                    <Text style={styles.resultDescription} numberOfLines={1}>
+                      {result.description}
                     </Text>
+                  )}
+                  {result.rating && (
                     <View style={styles.ratingContainer}>
-                      <Ionicons name="star" size={16} color="#FFD700" />
-                      <Text style={styles.ratingText}>{trip.rating}</Text>
+                      <Ionicons name="star" size={14} color="#FFD700" />
+                      <Text style={styles.ratingText}>{result.rating}</Text>
                     </View>
-                  </View>
+                  )}
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#A0B4C8" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {searchResults.length === 0 && !loading && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Popular Destinations</Text>
+            </View>
+            {popularDestinations.map((destination) => (
+              <TouchableOpacity key={destination.id} style={styles.popularCard}>
+                <Image source={{ uri: destination.image }} style={styles.popularImage} />
+                <View style={styles.popularContent}>
+                  <Text style={styles.popularName}>{destination.name}</Text>
+                  <Text style={styles.popularDescription}>{destination.description}</Text>
+                  <TouchableOpacity
+                    style={styles.exploreButton}
+                    onPress={() => {
+                      setSearchQuery(destination.name);
+                      handleSearch();
+                    }}
+                  >
+                    <Text style={styles.exploreButtonText}>Explore with AI</Text>
+                    <Ionicons name="sparkles" size={16} color="#5DA7DB" />
+                  </TouchableOpacity>
                 </View>
               </TouchableOpacity>
             ))}
-          </ScrollView>
-        </View>
+          </View>
+        )}
 
-        {/* Community Trips */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 32 }}>
-          <Text style={styles.sectionTitle}>Community Favorites</Text>
-          {communityTrips.map((trip) => (
-            <TouchableOpacity key={trip.id} style={styles.communityCard}>
-              <Image
-                source={{ uri: trip.image }}
-                style={styles.communityImage}
-              />
-              <View style={styles.ratingBadge}>
-                <Ionicons name="star" size={14} color="#FFD700" />
-                <Text style={styles.ratingBadgeText}>{trip.rating}</Text>
-              </View>
-              <View style={styles.communityCardContent}>
-                <Text style={styles.communityTitle}>{trip.title}</Text>
-                <Text style={styles.communityLocation}>
-                  {trip.location} • {trip.duration}
-                </Text>
-                <View style={styles.communityFooter}>
-                  <View style={styles.tagsRow}>
-                    {trip.tags.map((tag) => (
-                      <View key={tag} style={styles.communityTag}>
-                        <Text style={styles.communityTagText}>{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
-                  <Text style={styles.authorText}>by {trip.author}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.aiFeatureCard}>
+          <View style={styles.aiFeatureHeader}>
+            <Ionicons name="bulb" size={32} color="#5DA7DB" />
+            <Text style={styles.aiFeatureTitle}>AI-Powered Planning</Text>
+          </View>
+          <Text style={styles.aiFeatureDescription}>
+            Get personalized recommendations, estimated visit durations, and smart itineraries
+            powered by advanced AI
+          </Text>
+          <View style={styles.featuresGrid}>
+            <View style={styles.featureItem}>
+              <Ionicons name="time" size={20} color="#5DA7DB" />
+              <Text style={styles.featureText}>Duration Estimates</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Ionicons name="map" size={20} color="#5DA7DB" />
+              <Text style={styles.featureText}>Smart Routes</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Ionicons name="star" size={20} color="#5DA7DB" />
+              <Text style={styles.featureText}>Personalized Tips</Text>
+            </View>
+          </View>
         </View>
-
-        <View style={{ height: 100 }} />
       </ScrollView>
-
-      {/* Floating Create Button */}
-      <TouchableOpacity style={styles.createButton}>
-        <Ionicons name="add-circle" size={24} color="#FFFFFF" />
-        <Text style={styles.createButtonText}>Create Your Trip</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -239,45 +288,55 @@ const styles = StyleSheet.create({
     paddingTop: 48,
     paddingHorizontal: 20,
     paddingBottom: 16,
-    backgroundColor: '#FFFFFF',
   },
   headerTitle: {
     fontSize: 32,
     fontWeight: '700',
     color: '#0E2954',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   headerSubtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#5DA7DB',
-    marginBottom: 20,
   },
-  searchBar: {
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    gap: 12,
+  },
+  searchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F9FC',
     borderRadius: 24,
     paddingHorizontal: 16,
-    height: 48,
-    shadowColor: '#0E2954',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
+    height: 52,
+    borderWidth: 2,
     borderColor: '#E8F1F8',
+    gap: 12,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
     color: '#0E2954',
   },
-  filterContainer: {
+  searchButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#5DA7DB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categoriesContainer: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingBottom: 16,
     gap: 12,
   },
-  filterChip: {
+  categoryChip: {
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 24,
@@ -286,18 +345,62 @@ const styles = StyleSheet.create({
     borderColor: '#E8F1F8',
     marginRight: 12,
   },
-  filterChipActive: {
+  categoryChipActive: {
     backgroundColor: '#5DA7DB',
     borderColor: '#5DA7DB',
   },
-  filterText: {
+  categoryText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#0E2954',
   },
-  filterTextActive: {
-    fontWeight: '600',
+  categoryTextActive: {
     color: '#FFFFFF',
+  },
+  content: {
+    flex: 1,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#5DA7DB',
+    marginTop: 16,
+    fontWeight: '600',
+  },
+  aiSuggestionsCard: {
+    marginHorizontal: 20,
+    marginBottom: 24,
+    backgroundColor: '#EBF5FA',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#5DA7DB',
+  },
+  aiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  aiTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0E2954',
+  },
+  aiContent: {
+    fontSize: 15,
+    color: '#0E2954',
+    lineHeight: 22,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 22,
@@ -306,67 +409,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 16,
   },
-  carouselContainer: {
+  resultCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 20,
-    gap: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F9FC',
+    gap: 12,
   },
-  featuredCard: {
-    width: width - 80,
-    height: 320,
+  resultIcon: {
+    width: 48,
+    height: 48,
     borderRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#0E2954',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  cardGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-  },
-  cardContent: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-  },
-  tag: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 24,
-    backgroundColor: 'rgba(93, 167, 219, 0.9)',
-  },
-  tagText: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  cardTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    backgroundColor: '#EBF5FA',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  cardLocation: {
+  resultContent: {
+    flex: 1,
+  },
+  resultName: {
     fontSize: 16,
-    color: '#E8F1F8',
+    fontWeight: '700',
+    color: '#0E2954',
+    marginBottom: 4,
+  },
+  resultDescription: {
+    fontSize: 13,
+    color: '#A0B4C8',
+    marginBottom: 4,
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -374,104 +446,95 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   ratingText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  communityCard: {
-    marginBottom: 20,
-    borderRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#0E2954',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  communityImage: {
-    width: '100%',
-    height: 240,
-  },
-  ratingBadge: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingBadgeText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#0E2954',
   },
-  communityCardContent: {
-    padding: 16,
+  popularCard: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#0E2954',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  communityTitle: {
+  popularImage: {
+    width: 120,
+    height: 120,
+    backgroundColor: '#F5F9FC',
+  },
+  popularContent: {
+    flex: 1,
+    padding: 16,
+    justifyContent: 'space-between',
+  },
+  popularName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0E2954',
+    marginBottom: 4,
+  },
+  popularDescription: {
+    fontSize: 13,
+    color: '#A0B4C8',
+    marginBottom: 12,
+  },
+  exploreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  exploreButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#5DA7DB',
+  },
+  aiFeatureCard: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    backgroundColor: '#F5F9FC',
+    borderRadius: 20,
+    padding: 24,
+  },
+  aiFeatureHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  aiFeatureTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#0E2954',
-    marginBottom: 8,
   },
-  communityLocation: {
+  aiFeatureDescription: {
     fontSize: 14,
-    color: '#5DA7DB',
-    marginBottom: 12,
+    color: '#A0B4C8',
+    lineHeight: 20,
+    marginBottom: 20,
   },
-  communityFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  tagsRow: {
+  featuresGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 16,
   },
-  communityTag: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 24,
-    backgroundColor: '#F5F9FC',
-    borderWidth: 1,
-    borderColor: '#E8F1F8',
-  },
-  communityTagText: {
-    fontSize: 12,
-    color: '#0E2954',
-    fontWeight: '500',
-  },
-  authorText: {
-    fontSize: 12,
-    color: '#A0B4C8',
-    fontStyle: 'italic',
-  },
-  createButton: {
-    position: 'absolute',
-    bottom: 32,
-    right: 20,
-    backgroundColor: '#5DA7DB',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderRadius: 24,
+  featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    shadowColor: '#5DA7DB',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
   },
-  createButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  featureText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0E2954',
   },
 });

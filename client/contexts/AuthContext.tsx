@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeApp } from 'firebase/app';
 import { 
-  getAuth, 
+  getAuth,
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
   signInWithCredential,
@@ -10,7 +10,7 @@ import {
   signOut,
   updateProfile
 } from 'firebase/auth';
-import { getFirestore, collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
@@ -27,13 +27,16 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 interface User {
   id: string;
   email: string;
   name: string;
+  profilePicture?: string;
+  bio?: string;
+  isPrivate?: boolean;
 }
 
 interface AuthContextType {
@@ -80,57 +83,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const bootstrapAsync = async () => {
     try {
-      console.log('[AUTH] Bootstrapping - checking for stored session');
       const storedAccessToken = await AsyncStorage.getItem('accessToken');
       const storedRefreshToken = await AsyncStorage.getItem('refreshToken');
       const storedUser = await AsyncStorage.getItem('user');
 
       if (storedAccessToken && storedUser) {
-        console.log('[AUTH] Stored session found');
         setAccessToken(storedAccessToken);
         setRefreshToken(storedRefreshToken);
         setUser(JSON.parse(storedUser));
         setIsAuthenticated(true);
-        console.log('[AUTH] Session restored');
-      } else {
-        console.log('[AUTH] No stored session found');
       }
     } catch (e) {
-      console.error('[AUTH] Failed to restore session:', e);
+      console.error('Failed to restore session:', e);
     } finally {
       setLoading(false);
     }
   };
 
+  const createUserDocument = async (firebaseUser: any, displayName?: string) => {
+    const userRef = doc(db, 'users', firebaseUser.uid);
+    const userSnap = await getDoc(userRef);
+
+    if (!userSnap.exists()) {
+      await setDoc(userRef, {
+        id: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: displayName || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+        profilePicture: firebaseUser.photoURL || null,
+        bio: '',
+        isPrivate: false,
+        followersCount: 0,
+        followingCount: 0,
+        guidesCount: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    const updatedSnap = await getDoc(userRef);
+    return updatedSnap.data();
+  };
+
   const handleGoogleSignInWithToken = async (idToken: string) => {
     try {
-      console.log('[GOOGLE_AUTH] Signing in with Firebase credential');
       const credential = GoogleAuthProvider.credential(idToken);
       const userCredential = await signInWithCredential(auth, credential);
-      
-      console.log('[GOOGLE_AUTH] Firebase sign-in successful');
       const firebaseUser = userCredential.user;
       const token = await firebaseUser.getIdToken();
+
+      const userData = await createUserDocument(firebaseUser);
       
-      const userData: User = {
-        id: firebaseUser.uid,
-        email: firebaseUser.email || '',
-        name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+      if (!userData) {
+        throw new Error('Failed to create user document');
+      }
+
+      const user: User = {
+        id: userData.id,
+        email: userData.email,
+        name: userData.name,
+        profilePicture: userData.profilePicture,
+        bio: userData.bio,
+        isPrivate: userData.isPrivate,
       };
 
-      console.log('[GOOGLE_AUTH] Storing tokens in AsyncStorage');
       await AsyncStorage.setItem('accessToken', token);
       await AsyncStorage.setItem('refreshToken', token);
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
+      await AsyncStorage.setItem('user', JSON.stringify(user));
 
-      console.log('[GOOGLE_AUTH] Updating state');
       setAccessToken(token);
       setRefreshToken(token);
-      setUser(userData);
+      setUser(user);
       setIsAuthenticated(true);
-      console.log('[GOOGLE_AUTH] Google login completed successfully');
     } catch (err: any) {
-      console.error('[GOOGLE_AUTH] Error:', err);
+      console.error('Google auth error:', err);
       throw new Error(err.message || 'Google sign-in failed');
     }
   };
@@ -139,32 +164,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      console.log('[AUTH] Login started for:', email);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      console.log('[AUTH] Login response received');
-      
       const firebaseUser = userCredential.user;
       const token = await firebaseUser.getIdToken();
+
+      const userRef = doc(db, 'users', firebaseUser.uid);
+      const userSnap = await getDoc(userRef);
+      const userData = userSnap.data();
       
-      const userData: User = {
+      const user: User = {
         id: firebaseUser.uid,
         email: firebaseUser.email || '',
-        name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+        name: userData?.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+        profilePicture: userData?.profilePicture,
+        bio: userData?.bio,
+        isPrivate: userData?.isPrivate,
       };
 
-      console.log('[AUTH] Storing tokens in AsyncStorage');
       await AsyncStorage.setItem('accessToken', token);
       await AsyncStorage.setItem('refreshToken', token);
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
+      await AsyncStorage.setItem('user', JSON.stringify(user));
 
-      console.log('[AUTH] Updating state');
       setAccessToken(token);
       setRefreshToken(token);
-      setUser(userData);
+      setUser(user);
       setIsAuthenticated(true);
-      console.log('[AUTH] Login completed successfully');
     } catch (err: any) {
-      console.error('[AUTH] Login error caught:', err);
       let errorMessage = 'Login failed';
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
         errorMessage = 'Invalid email or password';
@@ -184,13 +209,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      console.log('[AUTH] Google login started');
       const result = await promptAsync();
       if (result.type !== 'success') {
         throw new Error('Google sign-in was cancelled');
       }
     } catch (err: any) {
-      console.error('[AUTH] Google login error caught:', err);
       const errorMessage = err.message || 'Google login failed';
       setError(errorMessage);
       setLoading(false);
@@ -209,16 +232,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         displayName: name,
       });
 
-      const userDocRef = doc(db, 'users', firebaseUser.uid);
-      await setDoc(userDocRef, {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email || '',
-        name: name,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      await createUserDocument(firebaseUser, name);
     } catch (err: any) {
-      console.error('[AUTH] Register error caught:', err);
       let errorMessage = 'Registration failed';
       if (err.code === 'auth/email-already-in-use') {
         errorMessage = 'Email already registered. Please log in instead.';
@@ -236,7 +251,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      console.log('[AUTH] Logout started');
       await signOut(auth);
       await AsyncStorage.removeItem('accessToken');
       await AsyncStorage.removeItem('refreshToken');
@@ -246,9 +260,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setIsAuthenticated(false);
       setError(null);
-      console.log('[AUTH] Logout completed successfully');
     } catch (err) {
-      console.error('[AUTH] Logout failed:', err);
+      console.error('Logout failed:', err);
     }
   };
 
