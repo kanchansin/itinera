@@ -18,7 +18,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import axios from 'axios';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/services/firebase';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 const { width } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:5000/api';
@@ -179,9 +179,24 @@ export default function CreateTripScreen() {
       return;
     }
 
+    if (!user?.id) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
+    if (!startCoords) {
+      Alert.alert('Error', 'Starting location coordinates not found');
+      return;
+    }
+
     setSaving(true);
     try {
+      const tripId = editMode && existingTrip?.id 
+        ? existingTrip.id 
+        : `trip_${user.id}_${Date.now()}`;
+
       const tripData = {
+        id: tripId,
         tripName: tripTitle,
         date: startTime,
         startLocation: startLocation,
@@ -201,33 +216,47 @@ export default function CreateTripScreen() {
             status: 'upcoming',
           })),
         ],
-        userId: user?.id || '',
+        userId: user.id,
         destination: destinations[destinations.length - 1]?.name || startLocation,
         isPublic: false,
-        createdAt: new Date().toISOString(),
+        likesCount: 0,
+        createdAt: editMode && existingTrip?.createdAt ? existingTrip.createdAt : serverTimestamp(),
+        updatedAt: serverTimestamp(),
       };
 
-      // Use the correct trip ID from existing trip or generate new one
-      const tripId = editMode && existingTrip?.id ? existingTrip.id : `trip_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const tripRef = doc(db, 'trips', tripId);
-      
+
       if (editMode && existingTrip?.id) {
+        const tripSnapshot = await getDoc(tripRef);
+        if (!tripSnapshot.exists()) {
+          throw new Error('Trip not found');
+        }
+        
+        const existingData = tripSnapshot.data();
+        if (existingData.userId !== user.id) {
+          throw new Error('Not authorized to update this trip');
+        }
+
         await updateDoc(tripRef, {
-          ...tripData,
-          updatedAt: new Date().toISOString(),
+          tripName: tripData.tripName,
+          date: tripData.date,
+          startLocation: tripData.startLocation,
+          startTime: tripData.startTime,
+          transport: tripData.transport,
+          stops: tripData.stops,
+          destination: tripData.destination,
+          updatedAt: tripData.updatedAt,
         });
       } else {
-        await setDoc(tripRef, {
-          ...tripData,
-          id: tripId,
-        });
+        await setDoc(tripRef, tripData);
       }
 
       Alert.alert('Success', editMode ? 'Trip updated successfully' : 'Trip created successfully');
       router.replace('/(tabs)');
     } catch (error) {
       console.error('Save trip error:', error);
-      Alert.alert('Error', `Failed to save trip: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', `Failed to save trip: ${errorMessage}`);
     } finally {
       setSaving(false);
     }

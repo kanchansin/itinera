@@ -271,18 +271,27 @@ export const calculateTripRoute = async (req, res) => {
           
           if (route.overview_polyline && route.overview_polyline.points) {
             const decodedPoints = decodePolyline(route.overview_polyline.points)
+            if (i > 0) {
+              decodedPoints.shift()
+            }
             allRoutePoints.push(...decodedPoints)
           } else {
-            allRoutePoints.push(stops[i])
+            if (i === 0) {
+              allRoutePoints.push(stops[i])
+            }
             allRoutePoints.push(stops[i + 1])
           }
         } else {
-          allRoutePoints.push(stops[i])
+          if (i === 0) {
+            allRoutePoints.push(stops[i])
+          }
           allRoutePoints.push(stops[i + 1])
         }
       } catch (segmentError) {
         console.error(`Error calculating segment ${i} to ${i + 1}:`, segmentError.message)
-        allRoutePoints.push(stops[i])
+        if (i === 0) {
+          allRoutePoints.push(stops[i])
+        }
         allRoutePoints.push(stops[i + 1])
       }
     }

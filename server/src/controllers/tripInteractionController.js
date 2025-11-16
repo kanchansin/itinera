@@ -1,4 +1,5 @@
 import { getDB } from "../config/database.js"
+
 export const likeTrip = async (req, res) => {
   try {
     const { tripId } = req.params
@@ -26,6 +27,7 @@ export const likeTrip = async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }
+
 export const unlikeTrip = async (req, res) => {
   try {
     const { tripId } = req.params
@@ -44,6 +46,7 @@ export const unlikeTrip = async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }
+
 export const saveTrip = async (req, res) => {
   try {
     const { tripId } = req.params
@@ -66,6 +69,7 @@ export const saveTrip = async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }
+
 export const unsaveTrip = async (req, res) => {
   try {
     const { tripId } = req.params
@@ -79,6 +83,7 @@ export const unsaveTrip = async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }
+
 export const getSavedTrips = async (req, res) => {
   try {
     const userId = req.user.userId
@@ -104,6 +109,7 @@ export const getSavedTrips = async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }
+
 export const addComment = async (req, res) => {
   try {
     const { tripId } = req.params
@@ -129,6 +135,7 @@ export const addComment = async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }
+
 export const getComments = async (req, res) => {
   try {
     const { tripId } = req.params

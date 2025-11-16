@@ -142,8 +142,8 @@ export default function ProfileScreen() {
         <View style={styles.profileSection}>
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
-              {userData?.profilePicture ? (
-                <Image source={{ uri: userData.profilePicture }} style={styles.avatar} />
+              {userData?.profilePicture || user?.profilePicture ? (
+                <Image source={{ uri: userData?.profilePicture || user?.profilePicture }} style={styles.avatar} />
               ) : (
                 <View style={[styles.avatar, styles.avatarPlaceholder]}>
                   <Ionicons name="person" size={48} color="#A0B4C8" />
@@ -168,7 +168,7 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{userData?.name || 'User'}</Text>
+            <Text style={styles.profileName}>{userData?.name || user?.name || 'User'}</Text>
             {userData?.bio && <Text style={styles.profileBio}>{userData.bio}</Text>}
           </View>
 
