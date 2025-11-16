@@ -1,5 +1,6 @@
 import { getDB } from "../config/database.js"
 import { getDirections } from "../services/googleMapsService.js"
+
 export const createTrip = async (req, res) => {
   try {
     const { title, destination, startLocation, startTime, endTime, transport, stops, isPublic } = req.body
@@ -17,6 +18,7 @@ export const createTrip = async (req, res) => {
       endTime,
       transport,
       isPublic: isPublic || false,
+      likesCount: 0,
       createdAt: new Date().toISOString(),
     }
     await tripRef.set(tripData)
@@ -43,6 +45,7 @@ export const createTrip = async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }
+
 export const getTrips = async (req, res) => {
   try {
     const userId = req.user.userId
@@ -70,6 +73,7 @@ export const getTrips = async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }
+
 export const getTripById = async (req, res) => {
   try {
     const { id } = req.params
@@ -96,6 +100,7 @@ export const getTripById = async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }
+
 export const updateTrip = async (req, res) => {
   try {
     const { id } = req.params
@@ -128,6 +133,7 @@ export const updateTrip = async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }
+
 export const deleteTrip = async (req, res) => {
   try {
     const { id } = req.params
@@ -156,6 +162,7 @@ export const deleteTrip = async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }
+
 export const getPublicTrips = async (req, res) => {
   try {
     const { destination, limit = 20, offset = 0 } = req.query
@@ -173,6 +180,7 @@ export const getPublicTrips = async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 }
+
 export const calculateTripDuration = async (req, res) => {
   try {
     const { stops, transport = "driving" } = req.body
@@ -196,4 +204,87 @@ export const calculateTripDuration = async (req, res) => {
     console.error("Calculate Trip Duration Error:", error.message)
     res.status(500).json({ error: error.message })
   }
+}
+
+export const calculateTripRoute = async (req, res) => {
+  try {
+    const { stops, transport = "driving" } = req.body
+    if (!stops || stops.length < 2) {
+      return res.status(400).json({ error: "At least 2 stops required" })
+    }
+    
+    const routePoints = []
+    let totalDuration = 0
+    let totalDistance = 0
+    
+    for (let i = 0; i < stops.length - 1; i++) {
+      const directions = await getDirections(
+        `${stops[i].latitude},${stops[i].longitude}`,
+        `${stops[i + 1].latitude},${stops[i + 1].longitude}`,
+        transport,
+      )
+      
+      if (directions.routes && directions.routes.length > 0) {
+        const route = directions.routes[0]
+        const leg = route.legs[0]
+        
+        totalDuration += leg.duration.value
+        totalDistance += leg.distance.value
+        
+        if (route.overview_polyline && route.overview_polyline.points) {
+          const decoded = decodePolyline(route.overview_polyline.points)
+          routePoints.push(...decoded)
+        }
+      }
+    }
+    
+    if (routePoints.length === 0) {
+      return res.json({ route: stops })
+    }
+    
+    res.json({
+      route: routePoints,
+      totalDuration: Math.ceil(totalDuration / 60),
+      totalDistance: Math.ceil(totalDistance / 1000),
+    })
+  } catch (error) {
+    console.error("Calculate Trip Route Error:", error.message)
+    res.status(500).json({ error: error.message })
+  }
+}
+
+function decodePolyline(encoded) {
+  const points = []
+  let index = 0
+  let lat = 0
+  let lng = 0
+
+  while (index < encoded.length) {
+    let b
+    let shift = 0
+    let result = 0
+    do {
+      b = encoded.charCodeAt(index++) - 63
+      result |= (b & 0x1f) << shift
+      shift += 5
+    } while (b >= 0x20)
+    const dlat = (result & 1) !== 0 ? ~(result >> 1) : result >> 1
+    lat += dlat
+
+    shift = 0
+    result = 0
+    do {
+      b = encoded.charCodeAt(index++) - 63
+      result |= (b & 0x1f) << shift
+      shift += 5
+    } while (b >= 0x20)
+    const dlng = (result & 1) !== 0 ? ~(result >> 1) : result >> 1
+    lng += dlng
+
+    points.push({
+      latitude: lat / 1e5,
+      longitude: lng / 1e5,
+    })
+  }
+  return points
 }

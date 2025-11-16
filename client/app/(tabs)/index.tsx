@@ -1,4 +1,3 @@
-// client/app/(tabs)/index.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -100,11 +99,20 @@ export default function HomeScreen() {
     }
   };
 
+  const handleEditTrip = () => {
+    router.push({
+      pathname: '/(tabs)/create-trip',
+      params: {
+        editMode: 'true',
+        tripData: JSON.stringify(currentTrip),
+      },
+    });
+  };
+
   return (
     <LinearGradient colors={['#FFFFFF', '#E8F1F8']} style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>My Trip</Text>
@@ -126,7 +134,6 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {/* Map Preview Card */}
         <View style={styles.mapCard}>
           <View style={styles.mapContainer}>
             <MapView
@@ -178,13 +185,11 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Trip Timeline */}
         <View style={styles.timelineSection}>
           <Text style={styles.sectionTitle}>Trip Timeline</Text>
           <View style={styles.timeline}>
             {currentTrip.stops.map((stop, index) => (
               <View key={stop.id} style={styles.timelineItemContainer}>
-                {/* Timeline Line */}
                 {index > 0 && (
                   <View
                     style={[
@@ -194,7 +199,6 @@ export default function HomeScreen() {
                   />
                 )}
 
-                {/* Stop Card */}
                 <View
                   style={[
                     styles.stopCard,
@@ -208,7 +212,6 @@ export default function HomeScreen() {
                     </View>
                   )}
 
-                  {/* Stop Number/Status Icon */}
                   <View
                     style={[
                       styles.stopIconContainer,
@@ -226,7 +229,6 @@ export default function HomeScreen() {
                     )}
                   </View>
 
-                  {/* Stop Details */}
                   <View style={styles.stopContent}>
                     <View style={styles.stopHeader}>
                       <Text style={styles.stopName}>{stop.name}</Text>
@@ -258,7 +260,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Trip Summary */}
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Trip Summary</Text>
           <View style={styles.summaryGrid}>
@@ -293,13 +294,12 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      {/* Floating Action Buttons */}
       <View style={styles.fabContainer}>
         <TouchableOpacity style={styles.fabSecondary}>
           <Ionicons name="refresh" size={24} color="#5DA7DB" />
           <Text style={styles.fabSecondaryText}>Recalculate</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.fabPrimary}>
+        <TouchableOpacity style={styles.fabPrimary} onPress={handleEditTrip}>
           <LinearGradient
             colors={['#5DA7DB', '#0E2954']}
             start={{ x: 0, y: 0 }}

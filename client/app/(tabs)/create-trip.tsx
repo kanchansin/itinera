@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,44 +8,129 @@ import {
   StatusBar,
   StyleSheet,
   Dimensions,
+  ActivityIndicator,
+  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Polyline, Marker } from 'react-native-maps';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import axios from 'axios';
 
 const { width } = Dimensions.get('window');
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:5000/api';
 
 const travelModes = [
-  { id: 'car', icon: 'car', label: 'Car' },
-  { id: 'walk', icon: 'walk', label: 'Walk' },
-  { id: 'bicycle', icon: 'bicycle', label: 'Bike' },
-  { id: 'bus', icon: 'bus', label: 'Bus' },
-  { id: 'train', icon: 'train', label: 'Train' },
+  { id: 'driving', icon: 'car', label: 'Car' },
+  { id: 'walking', icon: 'walk', label: 'Walk' },
+  { id: 'bicycling', icon: 'bicycle', label: 'Bike' },
+  { id: 'transit', icon: 'bus', label: 'Transit' },
 ];
 
-const mockDestinations = [
-  { id: 1, name: 'Lalbagh Botanical Garden', estimatedTime: '2-3 hours', distance: '5 km' },
-  { id: 2, name: 'Bangalore Palace', estimatedTime: '1.5 hours', distance: '8 km' },
-  { id: 3, name: 'Cubbon Park', estimatedTime: '1-2 hours', distance: '3 km' },
-];
+interface Stop {
+  id: number;
+  name: string;
+  estimatedTime?: string;
+  distance?: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+interface LocationSuggestion {
+  place_id: string;
+  name: string;
+  formatted_address: string;
+  geometry: {
+    location: {
+      lat: number;
+      lng: number;
+    };
+  };
+}
 
 export default function CreateTripScreen() {
+  const params = useLocalSearchParams();
+  const router = useRouter();
+  const editMode = params.editMode === 'true';
+  const existingTrip = params.tripData ? JSON.parse(params.tripData as string) : null;
+
   const [currentStep, setCurrentStep] = useState(1);
-  const [startLocation, setStartLocation] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [selectedMode, setSelectedMode] = useState('car');
-  const [destinations, setDestinations] = useState<any[]>([]);
+  const [startLocation, setStartLocation] = useState(existingTrip?.startLocation || '');
+  const [startTime, setStartTime] = useState(existingTrip?.startTime || '');
+  const [selectedMode, setSelectedMode] = useState(existingTrip?.transport || 'driving');
+  const [destinations, setDestinations] = useState<Stop[]>(existingTrip?.stops || []);
   const [newDestination, setNewDestination] = useState('');
+  const [mapRoute, setMapRoute] = useState<Array<{ latitude: number; longitude: number }>>([]);
+  const [startSuggestions, setStartSuggestions] = useState<LocationSuggestion[]>([]);
+  const [destSuggestions, setDestSuggestions] = useState<LocationSuggestion[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
+  const [startCoords, setStartCoords] = useState<{ latitude: number; longitude: number } | null>(
+    existingTrip?.stops?.[0]?.location || null
+  );
 
   const totalSteps = 4;
 
+  useEffect(() => {
+    if (destinations.length >= 2) {
+      calculateRoute();
+    }
+  }, [destinations, selectedMode]);
+
+  const searchLocations = async (query: string, isStart: boolean) => {
+    if (query.length < 3) {
+      if (isStart) setStartSuggestions([]);
+      else setDestSuggestions([]);
+      return;
+    }
+
+    setLoadingSuggestions(true);
+    try {
+      const response = await axios.get(`${API_URL}/destinations/search`, {
+        params: { query },
+      });
+
+      const suggestions = response.data.external || [];
+      if (isStart) {
+        setStartSuggestions(suggestions);
+      } else {
+        setDestSuggestions(suggestions);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const selectStartLocation = (suggestion: LocationSuggestion) => {
+    setStartLocation(suggestion.name);
+    setStartCoords({
+      latitude: suggestion.geometry.location.lat,
+      longitude: suggestion.geometry.location.lng,
+    });
+    setStartSuggestions([]);
+  };
+
+  const selectDestination = (suggestion: LocationSuggestion) => {
+    const newDest: Stop = {
+      id: Date.now(),
+      name: suggestion.name,
+      location: {
+        latitude: suggestion.geometry.location.lat,
+        longitude: suggestion.geometry.location.lng,
+      },
+    };
+    setDestinations([...destinations, newDest]);
+    setNewDestination('');
+    setDestSuggestions([]);
+  };
+
   const addDestination = () => {
-    if (newDestination.trim()) {
-      setDestinations([
-        ...destinations,
-        { id: Date.now(), name: newDestination, estimatedTime: '1-2 hours' },
-      ]);
-      setNewDestination('');
+    if (newDestination.trim() && destSuggestions.length > 0) {
+      selectDestination(destSuggestions[0]);
     }
   };
 
@@ -53,20 +138,45 @@ export default function CreateTripScreen() {
     setDestinations(destinations.filter((d) => d.id !== id));
   };
 
+  const calculateRoute = async () => {
+    if (!startCoords || destinations.length === 0) return;
+
+    setRecalculating(true);
+    try {
+      const allPoints = [startCoords, ...destinations.map((d) => d.location)];
+      
+      const response = await axios.post(`${API_URL}/trips/calculate-route`, {
+        stops: allPoints,
+        transport: selectedMode,
+      });
+
+      if (response.data.route) {
+        setMapRoute(response.data.route);
+      }
+    } catch (error) {
+      console.error('Route calculation error:', error);
+      setMapRoute([startCoords, ...destinations.map((d) => d.location)]);
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
+  const handleRecalculate = () => {
+    calculateRoute();
+  };
+
   return (
     <LinearGradient colors={['#FFFFFF', '#E8F1F8']} style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => {}}>
+        <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#0E2954" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create My Trip</Text>
+        <Text style={styles.headerTitle}>{editMode ? 'Edit Trip' : 'Create My Trip'}</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      {/* Progress Stepper */}
       <View style={styles.stepperContainer}>
         {[1, 2, 3, 4].map((step) => (
           <View key={step} style={styles.stepItem}>
@@ -102,7 +212,6 @@ export default function CreateTripScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
       >
-        {/* Step 1: Start Location & Time */}
         {currentStep === 1 && (
           <View style={styles.stepCard}>
             <View style={styles.stepHeader}>
@@ -122,9 +231,29 @@ export default function CreateTripScreen() {
                   placeholder="Enter your starting point"
                   placeholderTextColor="#A0B4C8"
                   value={startLocation}
-                  onChangeText={setStartLocation}
+                  onChangeText={(text) => {
+                    setStartLocation(text);
+                    searchLocations(text, true);
+                  }}
                 />
               </View>
+              {startSuggestions.length > 0 && (
+                <View style={styles.suggestionsContainer}>
+                  {startSuggestions.map((suggestion) => (
+                    <TouchableOpacity
+                      key={suggestion.place_id}
+                      style={styles.suggestionItem}
+                      onPress={() => selectStartLocation(suggestion)}
+                    >
+                      <Ionicons name="location" size={16} color="#5DA7DB" />
+                      <View style={styles.suggestionText}>
+                        <Text style={styles.suggestionName}>{suggestion.name}</Text>
+                        <Text style={styles.suggestionAddress}>{suggestion.formatted_address}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
 
             <View style={styles.inputGroup}>
@@ -143,7 +272,6 @@ export default function CreateTripScreen() {
           </View>
         )}
 
-        {/* Step 2: Add Destinations */}
         {currentStep === 2 && (
           <View style={styles.stepCard}>
             <View style={styles.stepHeader}>
@@ -164,7 +292,10 @@ export default function CreateTripScreen() {
                     placeholder="Search destinations..."
                     placeholderTextColor="#A0B4C8"
                     value={newDestination}
-                    onChangeText={setNewDestination}
+                    onChangeText={(text) => {
+                      setNewDestination(text);
+                      searchLocations(text, false);
+                    }}
                   />
                 </View>
                 <TouchableOpacity
@@ -174,6 +305,23 @@ export default function CreateTripScreen() {
                   <Ionicons name="add" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
+              {destSuggestions.length > 0 && (
+                <View style={styles.suggestionsContainer}>
+                  {destSuggestions.map((suggestion) => (
+                    <TouchableOpacity
+                      key={suggestion.place_id}
+                      style={styles.suggestionItem}
+                      onPress={() => selectDestination(suggestion)}
+                    >
+                      <Ionicons name="location" size={16} color="#5DA7DB" />
+                      <View style={styles.suggestionText}>
+                        <Text style={styles.suggestionName}>{suggestion.name}</Text>
+                        <Text style={styles.suggestionAddress}>{suggestion.formatted_address}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
 
             {destinations.length > 0 && (
@@ -187,12 +335,14 @@ export default function CreateTripScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.destinationName}>{dest.name}</Text>
-                      <View style={styles.aiTag}>
-                        <Ionicons name="sparkles" size={12} color="#5DA7DB" />
-                        <Text style={styles.aiTagText}>
-                          AI suggests: {dest.estimatedTime}
-                        </Text>
-                      </View>
+                      {dest.estimatedTime && (
+                        <View style={styles.aiTag}>
+                          <Ionicons name="sparkles" size={12} color="#5DA7DB" />
+                          <Text style={styles.aiTagText}>
+                            AI suggests: {dest.estimatedTime}
+                          </Text>
+                        </View>
+                      )}
                     </View>
                     <TouchableOpacity
                       onPress={() => removeDestination(dest.id)}
@@ -218,7 +368,6 @@ export default function CreateTripScreen() {
           </View>
         )}
 
-        {/* Step 3: Choose Travel Mode */}
         {currentStep === 3 && (
           <View style={styles.stepCard}>
             <View style={styles.stepHeader}>
@@ -263,7 +412,6 @@ export default function CreateTripScreen() {
           </View>
         )}
 
-        {/* Step 4: Preview & Generate */}
         {currentStep === 4 && (
           <View style={styles.stepCard}>
             <View style={styles.stepHeader}>
@@ -322,24 +470,55 @@ export default function CreateTripScreen() {
               </View>
             </View>
 
-            {/* Mini Map Preview */}
-            <View style={styles.mapPreview}>
-              <MapView
-                style={styles.map}
-                initialRegion={{
-                  latitude: 12.9716,
-                  longitude: 77.5946,
-                  latitudeDelta: 0.1,
-                  longitudeDelta: 0.1,
-                }}
-              >
-                <Marker coordinate={{ latitude: 12.9716, longitude: 77.5946 }} />
-              </MapView>
-              <View style={styles.mapOverlay}>
-                <Ionicons name="map" size={24} color="#5DA7DB" />
-                <Text style={styles.mapOverlayText}>Route Preview</Text>
+            {startCoords && destinations.length > 0 && (
+              <View style={styles.mapPreview}>
+                <MapView
+                  style={styles.map}
+                  initialRegion={{
+                    latitude: startCoords.latitude,
+                    longitude: startCoords.longitude,
+                    latitudeDelta: 0.1,
+                    longitudeDelta: 0.1,
+                  }}
+                >
+                  {mapRoute.length > 0 && (
+                    <Polyline
+                      coordinates={mapRoute}
+                      strokeColor="#5DA7DB"
+                      strokeWidth={3}
+                    />
+                  )}
+                  <Marker
+                    coordinate={startCoords}
+                    pinColor="#22c55e"
+                    title="Start"
+                  />
+                  {destinations.map((dest, index) => (
+                    <Marker
+                      key={dest.id}
+                      coordinate={dest.location}
+                      pinColor={index === destinations.length - 1 ? '#FF6B6B' : '#5DA7DB'}
+                      title={dest.name}
+                    />
+                  ))}
+                </MapView>
+                <View style={styles.mapOverlay}>
+                  <Ionicons name="map" size={24} color="#5DA7DB" />
+                  <Text style={styles.mapOverlayText}>Route Preview</Text>
+                  {recalculating && <ActivityIndicator size="small" color="#5DA7DB" />}
+                </View>
+                <TouchableOpacity
+                  style={styles.recalculateButton}
+                  onPress={handleRecalculate}
+                  disabled={recalculating}
+                >
+                  <Ionicons name="refresh" size={20} color="#FFFFFF" />
+                  <Text style={styles.recalculateButtonText}>
+                    {recalculating ? 'Recalculating...' : 'Recalculate'}
+                  </Text>
+                </TouchableOpacity>
               </View>
-            </View>
+            )}
 
             <TouchableOpacity style={styles.generateButton}>
               <LinearGradient
@@ -349,14 +528,15 @@ export default function CreateTripScreen() {
                 style={styles.generateGradient}
               >
                 <Ionicons name="sparkles" size={24} color="#FFFFFF" />
-                <Text style={styles.generateText}>Generate Smart Plan</Text>
+                <Text style={styles.generateText}>
+                  {editMode ? 'Save Changes' : 'Generate Smart Plan'}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
         )}
       </ScrollView>
 
-      {/* Navigation Buttons */}
       <View style={styles.navigationContainer}>
         {currentStep > 1 && (
           <TouchableOpacity
@@ -473,6 +653,7 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     marginBottom: 20,
+    position: 'relative',
   },
   inputLabel: {
     fontSize: 14,
@@ -495,6 +676,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#0E2954',
     marginLeft: 12,
+  },
+  suggestionsContainer: {
+    marginTop: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E8F1F8',
+    maxHeight: 200,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F9FC',
+  },
+  suggestionText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  suggestionName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0E2954',
+    marginBottom: 4,
+  },
+  suggestionAddress: {
+    fontSize: 12,
+    color: '#A0B4C8',
   },
   addDestinationRow: {
     flexDirection: 'row',
@@ -632,7 +843,7 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
   mapPreview: {
-    height: 200,
+    height: 300,
     borderRadius: 16,
     overflow: 'hidden',
     marginBottom: 16,
@@ -658,6 +869,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#0E2954',
+  },
+  recalculateButton: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    backgroundColor: '#5DA7DB',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#0E2954',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  recalculateButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   generateButton: {
     borderRadius: 16,

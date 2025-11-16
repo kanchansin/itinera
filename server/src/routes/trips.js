@@ -8,11 +8,13 @@ import {
   deleteTrip,
   getPublicTrips,
   calculateTripDuration,
+  calculateTripRoute,
 } from "../controllers/tripController.js"
 
 const router = express.Router()
 
 router.post("/calculate-duration", calculateTripDuration)
+router.post("/calculate-route", calculateTripRoute)
 router.get("/explore/feed", getPublicTrips)
 
 router.post("/", verifyToken, createTrip)
