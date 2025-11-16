@@ -10,6 +10,7 @@ import {
   signOut,
   updateProfile
 } from 'firebase/auth';
+import { getFirestore, collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
@@ -27,6 +28,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
 
 interface User {
   id: string;
@@ -200,35 +202,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      console.log('[AUTH] Register started for:', email);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      console.log('[AUTH] Register response received');
-      
       const firebaseUser = userCredential.user;
       
       await updateProfile(firebaseUser, {
         displayName: name,
       });
-      
-      const token = await firebaseUser.getIdToken();
-      
-      const userData: User = {
-        id: firebaseUser.uid,
+
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      await setDoc(userDocRef, {
+        uid: firebaseUser.uid,
         email: firebaseUser.email || '',
         name: name,
-      };
-
-      console.log('[AUTH] Storing tokens in AsyncStorage');
-      await AsyncStorage.setItem('accessToken', token);
-      await AsyncStorage.setItem('refreshToken', token);
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
-
-      console.log('[AUTH] Updating state');
-      setAccessToken(token);
-      setRefreshToken(token);
-      setUser(userData);
-      setIsAuthenticated(true);
-      console.log('[AUTH] Register completed successfully');
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
     } catch (err: any) {
       console.error('[AUTH] Register error caught:', err);
       let errorMessage = 'Registration failed';

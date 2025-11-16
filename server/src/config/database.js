@@ -8,7 +8,6 @@ const __dirname = path.dirname(__filename)
 const envPath = path.join(__dirname, '../../.env')
 
 dotenv.config({ path: envPath })
-console.log('[DATABASE CONFIG] Loading env from:', envPath)
 
 let db = null
 let isConnecting = false
@@ -16,22 +15,16 @@ let connectPromise = null
 
 export const connectDB = async () => {
   if (db) {
-    console.log("[DATABASE] Already connected to Firestore")
     return db
   }
   
   if (isConnecting) {
-    console.log("[DATABASE] Connection in progress, waiting...")
     return connectPromise
   }
   
   isConnecting = true
   connectPromise = new Promise((resolve, reject) => {
     try {
-      console.log("[DATABASE] Initializing Firebase connection...")
-      console.log("[DATABASE] Project ID:", process.env.FIREBASE_PROJECT_ID)
-      console.log("[DATABASE] Client Email:", process.env.FIREBASE_CLIENT_EMAIL)
-      
       let privateKey = process.env.FIREBASE_PRIVATE_KEY;
       if (!privateKey) {
         throw new Error("FIREBASE_PRIVATE_KEY is not set in environment variables")
@@ -43,12 +36,10 @@ export const connectDB = async () => {
       
       privateKey = privateKey.replace(/\\n/g, "\n");
       
-      console.log("[DATABASE] Private key loaded:", privateKey ? "Yes" : "No")
-      
       const serviceAccount = {
         type: "service_account",
         project_id: process.env.FIREBASE_PROJECT_ID,
-        private_key_id: "3a7afaead83aa8850ce3bf561f2d453002d4f962",
+        private_key_id: "0ef97c3d5d9b22618b0ce780e953689278bd8603",
         private_key: privateKey,
         client_email: process.env.FIREBASE_CLIENT_EMAIL,
         client_id: "107145288276419029769",
@@ -59,8 +50,6 @@ export const connectDB = async () => {
         universe_domain: "googleapis.com",
       }
 
-      console.log("[DATABASE] Service account object created")
-      console.log("[DATABASE] Checking required fields...")
       if (!serviceAccount.project_id) throw new Error("project_id is missing")
       if (!serviceAccount.private_key) throw new Error("private_key is missing")
       if (!serviceAccount.client_email) throw new Error("client_email is missing")
@@ -71,12 +60,9 @@ export const connectDB = async () => {
       })
 
       db = admin.firestore()
-      console.log("[DATABASE] Firebase initialized successfully")
-      console.log("[DATABASE] Firestore connected at", new Date().toISOString())
       resolve(db)
     } catch (err) {
       console.error("[DATABASE] Connection error:", err.message)
-      console.error("[DATABASE] Full error:", err)
       isConnecting = false
       reject(err)
     }

@@ -70,8 +70,6 @@ export default function SignupPage() {
       return;
     }
 
-    console.log('[SIGNUP] Attempting signup with email:', email);
-
     Animated.sequence([
       Animated.timing(signUpButtonScale, {
         toValue: 0.95,
@@ -86,18 +84,15 @@ export default function SignupPage() {
     ]).start();
 
     try {
-      console.log('[SIGNUP] Calling register function');
       await register(email, password, name);
-      console.log('[SIGNUP] Signup successful, navigating to home');
-      router.replace("/(tabs)");
+      Alert.alert('Success', 'Account created successfully. Please sign in.');
+      router.replace("/(auth)/login");
     } catch (err: any) {
-      console.log('[SIGNUP] Signup failed with error:', err.message);
       Alert.alert('Signup Failed', err.message || 'Failed to create account');
     }
   };
 
   const handleGoogleLogin = async () => {
-    console.log('[GOOGLE_SIGNUP] Initiating Google authentication flow');
     Animated.sequence([
       Animated.timing(googleButtonScale, {
         toValue: 0.95,
@@ -112,12 +107,9 @@ export default function SignupPage() {
     ]).start();
 
     try {
-      console.log('[GOOGLE_SIGNUP] Calling googleLogin');
       await googleLogin();
-      console.log('[GOOGLE_SIGNUP] Google signup successful, navigating to home');
       router.replace("/(tabs)");
     } catch (err: any) {
-      console.log('[GOOGLE_SIGNUP] Google sign-in failed with error:', err.message);
       Alert.alert('Google Sign-In Failed', err.message || 'Failed to sign in with Google');
     }
   };

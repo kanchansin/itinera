@@ -64,8 +64,6 @@ export default function LoginPage() {
       return;
     }
 
-    console.log('[LOGIN] Attempting login with email:', email);
-
     Animated.sequence([
       Animated.timing(signInButtonScale, {
         toValue: 0.95,
@@ -80,18 +78,14 @@ export default function LoginPage() {
     ]).start();
 
     try {
-      console.log('[LOGIN] Calling login function');
       await login(email, password);
-      console.log('[LOGIN] Login successful, navigating to home');
       router.replace("/(tabs)");
     } catch (err: any) {
-      console.log('[LOGIN] Login failed with error:', err.message);
       Alert.alert('Login Failed', err.message || 'Invalid credentials');
     }
   };
 
   const handleGoogleLogin = async () => {
-    console.log('[GOOGLE_LOGIN] Initiating Google authentication flow');
     Animated.sequence([
       Animated.timing(googleButtonScale, {
         toValue: 0.95,
@@ -106,12 +100,9 @@ export default function LoginPage() {
     ]).start();
 
     try {
-      console.log('[GOOGLE_LOGIN] Calling googleLogin');
       await googleLogin();
-      console.log('[GOOGLE_LOGIN] Google login successful, navigating to home');
       router.replace("/(tabs)");
     } catch (err: any) {
-      console.log('[GOOGLE_LOGIN] Google sign-in failed with error:', err.message);
       Alert.alert('Google Sign-In Failed', err.message || 'Failed to sign in with Google');
     }
   };
