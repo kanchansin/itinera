@@ -8,7 +8,8 @@ import {
   signInWithCredential,
   GoogleAuthProvider,
   signOut,
-  updateProfile
+  updateProfile,
+  onAuthStateChanged
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import * as Google from 'expo-auth-session/providers/google';
@@ -71,7 +72,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    bootstrapAsync();
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const token = await firebaseUser.getIdToken();
+          const userRef = doc(db, 'users', firebaseUser.uid);
+          const userSnap = await getDoc(userRef);
+          const userData = userSnap.data();
+          
+          const user: User = {
+            id: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            name: userData?.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+            profilePicture: userData?.profilePicture,
+            bio: userData?.bio,
+            isPrivate: userData?.isPrivate,
+          };
+
+          await AsyncStorage.setItem('accessToken', token);
+          await AsyncStorage.setItem('refreshToken', token);
+          await AsyncStorage.setItem('user', JSON.stringify(user));
+
+          setAccessToken(token);
+          setRefreshToken(token);
+          setUser(user);
+          setIsAuthenticated(true);
+        } catch (error) {
+          console.error('Auth state change error:', error);
+        }
+      } else {
+        await AsyncStorage.removeItem('accessToken');
+        await AsyncStorage.removeItem('refreshToken');
+        await AsyncStorage.removeItem('user');
+        setAccessToken(null);
+        setRefreshToken(null);
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -80,25 +121,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       handleGoogleSignInWithToken(id_token);
     }
   }, [response]);
-
-  const bootstrapAsync = async () => {
-    try {
-      const storedAccessToken = await AsyncStorage.getItem('accessToken');
-      const storedRefreshToken = await AsyncStorage.getItem('refreshToken');
-      const storedUser = await AsyncStorage.getItem('user');
-
-      if (storedAccessToken && storedUser) {
-        setAccessToken(storedAccessToken);
-        setRefreshToken(storedRefreshToken);
-        setUser(JSON.parse(storedUser));
-        setIsAuthenticated(true);
-      }
-    } catch (e) {
-      console.error('Failed to restore session:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const createUserDocument = async (firebaseUser: any, displayName?: string) => {
     const userRef = doc(db, 'users', firebaseUser.uid);
@@ -127,35 +149,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleGoogleSignInWithToken = async (idToken: string) => {
     try {
       const credential = GoogleAuthProvider.credential(idToken);
-      const userCredential = await signInWithCredential(auth, credential);
-      const firebaseUser = userCredential.user;
-      const token = await firebaseUser.getIdToken();
-
-      const userData = await createUserDocument(firebaseUser);
-      
-      if (!userData) {
-        throw new Error('Failed to create user document');
-      }
-
-      const user: User = {
-        id: userData.id,
-        email: userData.email,
-        name: userData.name,
-        profilePicture: userData.profilePicture,
-        bio: userData.bio,
-        isPrivate: userData.isPrivate,
-      };
-
-      await AsyncStorage.setItem('accessToken', token);
-      await AsyncStorage.setItem('refreshToken', token);
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-
-      setAccessToken(token);
-      setRefreshToken(token);
-      setUser(user);
-      setIsAuthenticated(true);
+      await signInWithCredential(auth, credential);
     } catch (err: any) {
       console.error('Google auth error:', err);
+      setLoading(false);
       throw new Error(err.message || 'Google sign-in failed');
     }
   };
@@ -164,31 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const firebaseUser = userCredential.user;
-      const token = await firebaseUser.getIdToken();
-
-      const userRef = doc(db, 'users', firebaseUser.uid);
-      const userSnap = await getDoc(userRef);
-      const userData = userSnap.data();
-      
-      const user: User = {
-        id: firebaseUser.uid,
-        email: firebaseUser.email || '',
-        name: userData?.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-        profilePicture: userData?.profilePicture,
-        bio: userData?.bio,
-        isPrivate: userData?.isPrivate,
-      };
-
-      await AsyncStorage.setItem('accessToken', token);
-      await AsyncStorage.setItem('refreshToken', token);
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-
-      setAccessToken(token);
-      setRefreshToken(token);
-      setUser(user);
-      setIsAuthenticated(true);
+      await signInWithEmailAndPassword(auth, email, password);
     } catch (err: any) {
       let errorMessage = 'Login failed';
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
@@ -199,9 +172,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errorMessage = 'Too many attempts. Please try again later';
       }
       setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
       setLoading(false);
+      throw new Error(errorMessage);
     }
   };
 
@@ -243,22 +215,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         errorMessage = 'Password should be at least 6 characters';
       }
       setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
       setLoading(false);
+      throw new Error(errorMessage);
     }
   };
 
   const logout = async () => {
     try {
       await signOut(auth);
-      await AsyncStorage.removeItem('accessToken');
-      await AsyncStorage.removeItem('refreshToken');
-      await AsyncStorage.removeItem('user');
-      setAccessToken(null);
-      setRefreshToken(null);
-      setUser(null);
-      setIsAuthenticated(false);
       setError(null);
     } catch (err) {
       console.error('Logout failed:', err);

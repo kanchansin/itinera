@@ -17,7 +17,7 @@ import MapView, { Polyline, Marker } from 'react-native-maps';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { db } from '@/services/firebase';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
 
 const { width } = Dimensions.get('window');
 
@@ -30,22 +30,19 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadTrips();
-  }, [user]);
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
 
-  const loadTrips = async () => {
-    if (!user?.id) return;
+    const tripsRef = collection(db, 'trips');
+    const q = query(
+      tripsRef,
+      where('userId', '==', user.id),
+      orderBy('createdAt', 'desc')
+    );
 
-    try {
-      const tripsRef = collection(db, 'trips');
-      const q = query(
-        tripsRef,
-        where('userId', '==', user.id),
-        orderBy('createdAt', 'desc')
-      );
-
-      const snapshot = await getDocs(q);
-      
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
         const tripData = snapshot.docs[0].data();
         setCurrentTrip(tripData);
@@ -54,18 +51,23 @@ export default function HomeScreen() {
           const routePoints = tripData.stops.map((stop: any) => stop.location);
           setMapRoute(routePoints);
         }
+      } else {
+        setCurrentTrip(null);
+        setMapRoute([]);
       }
-    } catch (error) {
-      console.error('Load trips error:', error);
-    } finally {
       setLoading(false);
-    }
-  };
+      setRefreshing(false);
+    }, (error) => {
+      console.error('Load trips error:', error);
+      setLoading(false);
+      setRefreshing(false);
+    });
+
+    return () => unsubscribe();
+  }, [user?.id]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadTrips();
-    setRefreshing(false);
   };
 
   const getStatusColor = (status: string) => {
@@ -126,10 +128,16 @@ export default function HomeScreen() {
             style={styles.profileButton}
             onPress={() => router.push('/(tabs)/profile')}
           >
-            <Image
-              source={require('../../assets/profile.jpg')}
-              style={styles.profileImage}
-            />
+            {user?.profilePicture ? (
+              <Image
+                source={{ uri: user.profilePicture }}
+                style={styles.profileImage}
+              />
+            ) : (
+              <View style={[styles.profileImage, styles.profilePlaceholder]}>
+                <Ionicons name="person" size={24} color="#A0B4C8" />
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -171,10 +179,16 @@ export default function HomeScreen() {
           style={styles.profileButton}
           onPress={() => router.push('/(tabs)/profile')}
         >
-          <Image
-            source={require('../../assets/profile.jpg')}
-            style={styles.profileImage}
-          />
+          {user?.profilePicture ? (
+            <Image
+              source={{ uri: user.profilePicture }}
+              style={styles.profileImage}
+            />
+          ) : (
+            <View style={[styles.profileImage, styles.profilePlaceholder]}>
+              <Ionicons name="person" size={24} color="#A0B4C8" />
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -467,6 +481,11 @@ const styles = StyleSheet.create({
   profileImage: {
     width: '100%',
     height: '100%',
+  },
+  profilePlaceholder: {
+    backgroundColor: '#F5F9FC',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     flex: 1,
