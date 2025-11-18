@@ -1,3 +1,4 @@
+// client/app/(tabs)/discover.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -13,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/services/firebase';
-import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, setDoc, deleteDoc, updateDoc, increment } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, setDoc, deleteDoc, updateDoc, increment, onSnapshot } from 'firebase/firestore';
 
 const { width } = Dimensions.get('window');
 
@@ -22,12 +23,33 @@ export default function DiscoverScreen() {
   const [guides, setGuides] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [selectedTrip, setSelectedTrip] = useState<any>(null);
+  const [comments, setComments] = useState<any[]>([]);
 
   const filters = ['all', 'trending', 'new', 'popular'];
 
   useEffect(() => {
     loadGuides();
   }, [filter]);
+
+  useEffect(() => {
+    if (!selectedTrip) return;
+    
+    const commentsRef = collection(db, 'tripComments');
+    const q = query(
+      commentsRef,
+      where('tripId', '==', selectedTrip.id),
+      orderBy('createdAt', 'desc'),
+      limit(20)
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const newComments = snapshot.docs.map(doc => doc.data());
+      setComments(newComments);
+    });
+    
+    return () => unsubscribe();
+  }, [selectedTrip]);
 
   const loadGuides = async () => {
     try {
