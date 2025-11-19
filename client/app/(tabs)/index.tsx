@@ -70,19 +70,6 @@ export default function HomeScreen() {
     setRefreshing(true);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return '#22c55e';
-      case 'current':
-        return '#5DA7DB';
-      case 'upcoming':
-        return '#A0B4C8';
-      default:
-        return '#A0B4C8';
-    }
-  };
-
   const handleEditTrip = () => {
     if (!currentTrip) return;
     
@@ -104,25 +91,25 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <LinearGradient colors={['#FFFFFF', '#E8F1F8']} style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FAFAFF" />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#5DA7DB" />
+          <ActivityIndicator size="large" color="#A78BFA" />
           <Text style={styles.loadingText}>Loading your trips...</Text>
         </View>
-      </LinearGradient>
+      </View>
     );
   }
 
   if (!currentTrip) {
     return (
-      <LinearGradient colors={['#FFFFFF', '#E8F1F8']} style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FAFAFF" />
         
         <View style={styles.header}>
           <View>
+            <Text style={styles.greeting}>Good morning</Text>
             <Text style={styles.headerTitle}>My Trips</Text>
-            <Text style={styles.headerDate}>No active trips</Text>
           </View>
           <TouchableOpacity 
             style={styles.profileButton}
@@ -135,45 +122,47 @@ export default function HomeScreen() {
               />
             ) : (
               <View style={[styles.profileImage, styles.profilePlaceholder]}>
-                <Ionicons name="person" size={24} color="#A0B4C8" />
+                <Ionicons name="person" size={20} color="#A78BFA" />
               </View>
             )}
           </TouchableOpacity>
         </View>
 
         <View style={styles.emptyStateContainer}>
-          <Ionicons name="map-outline" size={80} color="#E8F1F8" />
-          <Text style={styles.emptyStateTitle}>No Trips Yet</Text>
+          <View style={styles.emptyIconCircle}>
+            <Ionicons name="airplane-outline" size={64} color="#C4B5FD" />
+          </View>
+          <Text style={styles.emptyStateTitle}>Start Your Journey</Text>
           <Text style={styles.emptyStateText}>
-            Create your first trip to start exploring
+            Create your first trip and explore the world with AI-powered planning
           </Text>
           <TouchableOpacity
             style={styles.createTripButton}
             onPress={() => router.push('/(tabs)/create-trip')}
           >
             <LinearGradient
-              colors={['#5DA7DB', '#0E2954']}
+              colors={['#A78BFA', '#8B5CF6']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.createTripGradient}
             >
-              <Ionicons name="add-circle" size={24} color="#FFFFFF" />
+              <Ionicons name="add" size={24} color="#FFFFFF" />
               <Text style={styles.createTripText}>Create Trip</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </LinearGradient>
+      </View>
     );
   }
 
   return (
-    <LinearGradient colors={['#FFFFFF', '#E8F1F8']} style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FAFAFF" />
 
       <View style={styles.header}>
         <View>
+          <Text style={styles.greeting}>Current Trip</Text>
           <Text style={styles.headerTitle}>{currentTrip.tripName}</Text>
-          <Text style={styles.headerDate}>{currentTrip.date || currentTrip.startTime}</Text>
         </View>
         <TouchableOpacity 
           style={styles.profileButton}
@@ -186,7 +175,7 @@ export default function HomeScreen() {
             />
           ) : (
             <View style={[styles.profileImage, styles.profilePlaceholder]}>
-              <Ionicons name="person" size={24} color="#A0B4C8" />
+              <Ionicons name="person" size={20} color="#A78BFA" />
             </View>
           )}
         </TouchableOpacity>
@@ -200,7 +189,18 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View style={styles.mapCard}>
+        <View style={styles.liveCard}>
+          <View style={styles.liveHeader}>
+            <View style={styles.liveIndicator}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>LIVE NOW</Text>
+            </View>
+            <TouchableOpacity style={styles.navigationButton}>
+              <Ionicons name="navigate" size={18} color="#FFFFFF" />
+              <Text style={styles.navigationText}>Navigate</Text>
+            </TouchableOpacity>
+          </View>
+          
           <View style={styles.mapContainer}>
             <MapView
               style={styles.map}
@@ -218,8 +218,8 @@ export default function HomeScreen() {
               {mapRoute.length > 0 && (
                 <Polyline
                   coordinates={mapRoute}
-                  strokeColor="#5DA7DB"
-                  strokeWidth={3}
+                  strokeColor="#A78BFA"
+                  strokeWidth={4}
                 />
               )}
               {currentTrip.stops && currentTrip.stops.map((stop: any, index: number) => (
@@ -228,176 +228,143 @@ export default function HomeScreen() {
                   coordinate={stop.location}
                   pinColor={
                     index === 0 
-                      ? '#22c55e' 
+                      ? '#34D399' 
                       : index === currentTrip.stops.length - 1 
-                        ? '#FF6B6B' 
-                        : '#5DA7DB'
+                        ? '#F87171' 
+                        : '#A78BFA'
                   }
-                  title={stop.name}
                 />
               ))}
             </MapView>
-            <LinearGradient
-              colors={['rgba(255,255,255,0.9)', 'transparent']}
-              style={styles.mapOverlay}
-            />
           </View>
-          <View style={styles.mapInfo}>
-            <View style={styles.mapInfoItem}>
-              <Ionicons name="location" size={16} color="#5DA7DB" />
-              <Text style={styles.mapInfoText}>
-                {currentTrip.stops?.length || 0} Stops
-              </Text>
+
+          <View style={styles.tripStats}>
+            <View style={styles.statItem}>
+              <Ionicons name="location" size={16} color="#A78BFA" />
+              <Text style={styles.statValue}>{currentTrip.stops?.length || 0}</Text>
+              <Text style={styles.statLabel}>stops</Text>
             </View>
-            <View style={styles.mapInfoItem}>
-              <Ionicons name="car-sport" size={16} color="#5DA7DB" />
-              <Text style={styles.mapInfoText}>
-                {currentTrip.transport || 'driving'}
-              </Text>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Ionicons name="car-sport" size={16} color="#A78BFA" />
+              <Text style={styles.statValue}>{currentTrip.transport || 'driving'}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Ionicons name="time" size={16} color="#A78BFA" />
+              <Text style={styles.statValue}>{currentTrip.startTime}</Text>
             </View>
           </View>
         </View>
 
-        <View style={styles.timelineSection}>
-          <Text style={styles.sectionTitle}>Trip Timeline</Text>
-          <View style={styles.timeline}>
-            {currentTrip.stops && currentTrip.stops.map((stop: any, index: number) => (
-              <View key={stop.id} style={styles.timelineItemContainer}>
-                {index > 0 && (
-                  <View
-                    style={[
-                      styles.timelineLine,
-                      { backgroundColor: getStatusColor(stop.status || 'upcoming') },
-                    ]}
-                  />
-                )}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Timeline</Text>
+          <TouchableOpacity>
+            <Text style={styles.seeAllButton}>View All</Text>
+          </TouchableOpacity>
+        </View>
 
+        <View style={styles.timeline}>
+          {currentTrip.stops && currentTrip.stops.slice(0, 3).map((stop: any, index: number) => (
+            <View key={stop.id} style={styles.timelineItem}>
+              <View style={styles.timelineLeft}>
                 <View
                   style={[
-                    styles.stopCard,
-                    stop.status === 'current' && styles.stopCardCurrent,
+                    styles.timelineDot,
+                    stop.status === 'completed' && styles.timelineDotCompleted,
+                    stop.status === 'current' && styles.timelineDotCurrent,
                   ]}
                 >
-                  {stop.status === 'current' && (
-                    <View style={styles.currentIndicator}>
-                      <View style={styles.pulseOuter} />
-                      <View style={styles.pulseInner} />
-                    </View>
+                  {stop.status === 'completed' ? (
+                    <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                  ) : stop.status === 'current' ? (
+                    <View style={styles.currentPulse} />
+                  ) : (
+                    <Text style={styles.timelineDotText}>{index + 1}</Text>
                   )}
-
-                  <View
-                    style={[
-                      styles.stopIconContainer,
-                      { backgroundColor: getStatusColor(stop.status || 'upcoming') },
-                    ]}
-                  >
-                    {stop.status === 'completed' ? (
-                      <Ionicons
-                        name="checkmark"
-                        size={20}
-                        color="#FFFFFF"
-                      />
-                    ) : (
-                      <Text style={styles.stopNumber}>{index + 1}</Text>
-                    )}
-                  </View>
-
-                  <View style={styles.stopContent}>
-                    <View style={styles.stopHeader}>
-                      <Text style={styles.stopName}>{stop.name}</Text>
-                      {stop.status === 'current' && (
-                        <View style={styles.liveTag}>
-                          <View style={styles.liveDot} />
-                          <Text style={styles.liveText}>Live</Text>
-                        </View>
-                      )}
-                    </View>
-                    {stop.description && (
-                      <Text style={styles.stopDescription}>
-                        {stop.description}
-                      </Text>
-                    )}
-                    {stop.arrival && stop.departure && (
-                      <View style={styles.stopTime}>
-                        <View style={styles.timeBlock}>
-                          <Ionicons name="log-in" size={14} color="#5DA7DB" />
-                          <Text style={styles.timeText}>{stop.arrival}</Text>
-                        </View>
-                        <Ionicons name="arrow-forward" size={14} color="#A0B4C8" />
-                        <View style={styles.timeBlock}>
-                          <Ionicons name="log-out" size={14} color="#5DA7DB" />
-                          <Text style={styles.timeText}>{stop.departure}</Text>
-                        </View>
-                      </View>
-                    )}
-                  </View>
                 </View>
+                {index < 2 && <View style={styles.timelineLine} />}
               </View>
-            ))}
-          </View>
+              
+              <View style={[
+                styles.timelineCard,
+                stop.status === 'current' && styles.timelineCardActive
+              ]}>
+                <Text style={styles.timelineStopName}>{stop.name}</Text>
+                {stop.status === 'current' && (
+                  <View style={styles.currentBadge}>
+                    <Text style={styles.currentBadgeText}>Current</Text>
+                  </View>
+                )}
+                {stop.arrival && stop.departure && (
+                  <View style={styles.timelineTime}>
+                    <Ionicons name="time-outline" size={14} color="#9CA3AF" />
+                    <Text style={styles.timelineTimeText}>
+                      {stop.arrival} - {stop.departure}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          ))}
         </View>
 
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Trip Summary</Text>
+          <Text style={styles.summaryTitle}>Trip Overview</Text>
           <View style={styles.summaryGrid}>
             <View style={styles.summaryItem}>
-              <View style={styles.summaryIcon}>
-                <Ionicons name="checkmark-done" size={20} color="#22c55e" />
+              <View style={[styles.summaryIcon, { backgroundColor: '#D1FAE5' }]}>
+                <Ionicons name="checkmark-done" size={20} color="#10B981" />
               </View>
               <Text style={styles.summaryValue}>
                 {currentTrip.stops?.filter((s: any) => s.status === 'completed').length || 0}
               </Text>
               <Text style={styles.summaryLabel}>Completed</Text>
             </View>
-            <View style={styles.summaryDivider} />
             <View style={styles.summaryItem}>
-              <View style={styles.summaryIcon}>
-                <Ionicons name="time" size={20} color="#5DA7DB" />
+              <View style={[styles.summaryIcon, { backgroundColor: '#E0E7FF' }]}>
+                <Ionicons name="time-outline" size={20} color="#6366F1" />
               </View>
               <Text style={styles.summaryValue}>
                 {currentTrip.stops?.filter((s: any) => s.status === 'upcoming').length || currentTrip.stops?.length || 0}
               </Text>
               <Text style={styles.summaryLabel}>Remaining</Text>
             </View>
-            <View style={styles.summaryDivider} />
             <View style={styles.summaryItem}>
-              <View style={styles.summaryIcon}>
-                <Ionicons name="location" size={20} color="#FFB800" />
+              <View style={[styles.summaryIcon, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="location" size={20} color="#F59E0B" />
               </View>
               <Text style={styles.summaryValue}>{currentTrip.stops?.length || 0}</Text>
-              <Text style={styles.summaryLabel}>Total Stops</Text>
+              <Text style={styles.summaryLabel}>Total</Text>
             </View>
           </View>
         </View>
       </ScrollView>
 
       <View style={styles.fabContainer}>
-        <TouchableOpacity 
-          style={styles.fabSecondary}
-          onPress={onRefresh}
-        >
-          <Ionicons name="refresh" size={24} color="#5DA7DB" />
-          <Text style={styles.fabSecondaryText}>Refresh</Text>
+        <TouchableOpacity style={styles.fabSecondary} onPress={onRefresh}>
+          <Ionicons name="refresh" size={22} color="#A78BFA" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.fabPrimary} onPress={handleEditTrip}>
           <LinearGradient
-            colors={['#5DA7DB', '#0E2954']}
+            colors={['#A78BFA', '#8B5CF6']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.fabGradient}
           >
-            <Ionicons name="create" size={24} color="#FFFFFF" />
-            <Text style={styles.fabPrimaryText}>Edit Trip</Text>
+            <Ionicons name="create-outline" size={22} color="#FFFFFF" />
+            <Text style={styles.fabText}>Edit Trip</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FAFAFF',
   },
   loadingContainer: {
     flex: 1,
@@ -405,10 +372,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 16,
-    color: '#5DA7DB',
+    fontSize: 15,
+    color: '#A78BFA',
     marginTop: 16,
-    fontWeight: '600',
+    fontWeight: '500',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 56,
+    paddingBottom: 20,
+  },
+  greeting: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginBottom: 4,
+    fontWeight: '500',
+    letterSpacing: 0.5,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1F2937',
+    letterSpacing: -0.5,
+  },
+  profileButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#F3F4F6',
+    backgroundColor: '#FFFFFF',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+  },
+  profilePlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyStateContainer: {
     flex: 1,
@@ -416,27 +421,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 40,
   },
+  emptyIconCircle: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: '#FAF5FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 32,
+  },
   emptyStateTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#0E2954',
-    marginTop: 24,
-    marginBottom: 8,
+    color: '#1F2937',
+    marginBottom: 12,
   },
   emptyStateText: {
-    fontSize: 16,
-    color: '#A0B4C8',
+    fontSize: 15,
+    color: '#9CA3AF',
     textAlign: 'center',
-    marginBottom: 32,
+    lineHeight: 22,
+    marginBottom: 40,
   },
   createTripButton: {
-    borderRadius: 16,
+    borderRadius: 28,
     overflow: 'hidden',
-    shadowColor: '#5DA7DB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
   },
   createTripGradient: {
     flexDirection: 'row',
@@ -447,313 +461,278 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   createTripText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 48,
-    paddingBottom: 16,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#0E2954',
-    marginBottom: 4,
-  },
-  headerDate: {
-    fontSize: 14,
-    color: '#5DA7DB',
-    fontWeight: '500',
-  },
-  profileButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#E8F1F8',
-  },
-  profileImage: {
-    width: '100%',
-    height: '100%',
-  },
-  profilePlaceholder: {
-    backgroundColor: '#F5F9FC',
-    justifyContent: 'center',
-    alignItems: 'center',
+    letterSpacing: 0.3,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
-  mapCard: {
+  liveCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    overflow: 'hidden',
     marginBottom: 24,
-    shadowColor: '#0E2954',
+    shadowColor: '#A78BFA',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
-    elevation: 4,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  liveHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingBottom: 16,
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  liveText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#10B981',
+    letterSpacing: 1,
+  },
+  navigationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#A78BFA',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  navigationText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   mapContainer: {
     height: 200,
-    position: 'relative',
+    marginHorizontal: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#F9FAFB',
   },
   map: {
     width: '100%',
     height: '100%',
   },
-  mapOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 40,
-  },
-  mapInfo: {
+  tripStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    padding: 16,
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 16,
+  },
+  statItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  statDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: '#F3F4F6',
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  seeAllButton: {
+    fontSize: 14,
+    color: '#A78BFA',
+    fontWeight: '600',
+  },
+  timeline: {
+    marginBottom: 24,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  timelineLeft: {
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  timelineDot: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  timelineDotCompleted: {
+    backgroundColor: '#10B981',
+    borderColor: '#10B981',
+  },
+  timelineDotCurrent: {
+    backgroundColor: '#A78BFA',
+    borderColor: '#A78BFA',
+  },
+  timelineDotText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#9CA3AF',
+  },
+  currentPulse: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     backgroundColor: '#FFFFFF',
   },
-  mapInfoItem: {
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 4,
+  },
+  timelineCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#F3F4F6',
+  },
+  timelineCardActive: {
+    borderColor: '#A78BFA',
+    backgroundColor: '#FAF5FF',
+  },
+  timelineStopName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  currentBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E0E7FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  currentBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6366F1',
+    letterSpacing: 0.5,
+  },
+  timelineTime: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  mapInfoText: {
-    fontSize: 14,
-    color: '#0E2954',
-    fontWeight: '600',
-  },
-  timelineSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#0E2954',
-    marginBottom: 16,
-  },
-  timeline: {
-    position: 'relative',
-  },
-  timelineItemContainer: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  timelineLine: {
-    position: 'absolute',
-    left: 27,
-    top: -16,
-    width: 2,
-    height: 16,
-  },
-  stopCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    flexDirection: 'row',
-    shadowColor: '#0E2954',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-    position: 'relative',
-  },
-  stopCardCurrent: {
-    borderWidth: 2,
-    borderColor: '#5DA7DB',
-    shadowColor: '#5DA7DB',
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  currentIndicator: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-  },
-  pulseOuter: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#5DA7DB',
-    opacity: 0.3,
-  },
-  pulseInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#5DA7DB',
-    marginLeft: 4,
-    marginTop: 4,
-  },
-  stopIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  stopNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  stopContent: {
-    flex: 1,
-  },
-  stopHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  stopName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0E2954',
-    flex: 1,
-  },
-  liveTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EBF5FA',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#5DA7DB',
-  },
-  liveText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#5DA7DB',
-    textTransform: 'uppercase',
-  },
-  stopDescription: {
-    fontSize: 14,
-    color: '#A0B4C8',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  stopTime: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  timeBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  timeText: {
+  timelineTimeText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#0E2954',
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   summaryCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 20,
     marginBottom: 24,
-    shadowColor: '#0E2954',
+    shadowColor: '#A78BFA',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06,
     shadowRadius: 12,
-    elevation: 4,
+    elevation: 2,
   },
   summaryTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#0E2954',
-    marginBottom: 16,
+    color: '#1F2937',
+    marginBottom: 20,
   },
   summaryGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-around',
   },
   summaryItem: {
-    flex: 1,
     alignItems: 'center',
   },
   summaryIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F5F9FC',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   summaryValue: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#0E2954',
+    color: '#1F2937',
     marginBottom: 4,
   },
   summaryLabel: {
     fontSize: 12,
-    color: '#A0B4C8',
+    color: '#9CA3AF',
     fontWeight: '500',
-  },
-  summaryDivider: {
-    width: 1,
-    height: 60,
-    backgroundColor: '#E8F1F8',
   },
   fabContainer: {
     position: 'absolute',
     bottom: 24,
-    left: 20,
-    right: 20,
+    left: 24,
+    right: 24,
     flexDirection: 'row',
     gap: 12,
   },
   fabSecondary: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    paddingVertical: 16,
-    gap: 8,
-    borderWidth: 2,
-    borderColor: '#5DA7DB',
-    shadowColor: '#0E2954',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#A78BFA',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 12,
     elevation: 4,
-  },
-  fabSecondaryText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#5DA7DB',
+    borderWidth: 1.5,
+    borderColor: '#F3F4F6',
   },
   fabPrimary: {
     flex: 1,
-    borderRadius: 24,
+    borderRadius: 28,
     overflow: 'hidden',
-    shadowColor: '#5DA7DB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 6,
   },
@@ -764,9 +743,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     gap: 8,
   },
-  fabPrimaryText: {
-    fontSize: 16,
+  fabText: {
+    fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
 });

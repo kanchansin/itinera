@@ -14,11 +14,12 @@ import {
   Dimensions,
   RefreshControl,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { db } from '@/services/firebase';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 
 const { width } = Dimensions.get('window');
-const GRID_ITEM_SIZE = (width - 6) / 3;
+const GRID_ITEM_SIZE = (width - 54) / 3;
 
 export default function ProfileScreen() {
   const { logout, user } = useAuth();
@@ -116,21 +117,31 @@ export default function ProfileScreen() {
     setRefreshing(false);
   };
 
+  const menuItems = [
+    { icon: 'settings-outline', label: 'Settings', color: '#A78BFA' },
+    { icon: 'bookmark-outline', label: 'Saved', color: '#60A5FA' },
+    { icon: 'heart-outline', label: 'Favorites', color: '#F87171' },
+    { icon: 'notifications-outline', label: 'Notifications', color: '#FBBF24' },
+    { icon: 'shield-checkmark-outline', label: 'Privacy', color: '#34D399', action: togglePrivacy },
+    { icon: 'help-circle-outline', label: 'Help & Support', color: '#A78BFA' },
+    { icon: 'log-out-outline', label: 'Logout', color: '#F87171', action: handleLogout },
+  ];
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FAFAFF" />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={togglePrivacy}>
+        <TouchableOpacity style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color="#1F2937" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Profile</Text>
+        <TouchableOpacity onPress={togglePrivacy} style={styles.lockButton}>
           <Ionicons
             name={isPrivate ? 'lock-closed' : 'lock-open'}
-            size={24}
-            color="#0E2954"
+            size={20}
+            color="#A78BFA"
           />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{userData?.name || 'Profile'}</Text>
-        <TouchableOpacity onPress={handleLogout}>
-          <Ionicons name="menu" size={28} color="#0E2954" />
         </TouchableOpacity>
       </View>
 
@@ -140,40 +151,45 @@ export default function ProfileScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <View style={styles.profileSection}>
-          <View style={styles.profileHeader}>
-            <View style={styles.avatarContainer}>
-              {userData?.profilePicture || user?.profilePicture ? (
-                <Image source={{ uri: userData?.profilePicture || user?.profilePicture }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                  <Ionicons name="person" size={48} color="#A0B4C8" />
-                </View>
-              )}
-            </View>
-
-            <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{guides.length}</Text>
-                <Text style={styles.statLabel}>Guides</Text>
-              </View>
-              <TouchableOpacity style={styles.statItem}>
-                <Text style={styles.statValue}>{followers}</Text>
-                <Text style={styles.statLabel}>Followers</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.statItem}>
-                <Text style={styles.statValue}>{following}</Text>
-                <Text style={styles.statLabel}>Following</Text>
-              </TouchableOpacity>
+          <View style={styles.avatarContainer}>
+            {userData?.profilePicture || user?.profilePicture ? (
+              <Image source={{ uri: userData?.profilePicture || user?.profilePicture }} style={styles.avatar} />
+            ) : (
+              <LinearGradient
+                colors={['#E0E7FF', '#DDD6FE']}
+                style={[styles.avatar, styles.avatarPlaceholder]}
+              >
+                <Ionicons name="person" size={48} color="#8B5CF6" />
+              </LinearGradient>
+            )}
+            <View style={styles.editAvatarButton}>
+              <Ionicons name="camera" size={16} color="#FFFFFF" />
             </View>
           </View>
 
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{userData?.name || user?.name || 'User'}</Text>
-            {userData?.bio && <Text style={styles.profileBio}>{userData.bio}</Text>}
+          <Text style={styles.profileName}>{userData?.name || user?.name || 'User'}</Text>
+          {userData?.bio && <Text style={styles.profileBio}>{userData.bio}</Text>}
+
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{guides.length}</Text>
+              <Text style={styles.statLabel}>Trips</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <TouchableOpacity style={styles.statItem}>
+              <Text style={styles.statValue}>{followers}</Text>
+              <Text style={styles.statLabel}>Followers</Text>
+            </TouchableOpacity>
+            <View style={styles.statDivider} />
+            <TouchableOpacity style={styles.statItem}>
+              <Text style={styles.statValue}>{following}</Text>
+              <Text style={styles.statLabel}>Following</Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity style={styles.editButton}>
             <Text style={styles.editButtonText}>Edit Profile</Text>
+            <Ionicons name="create-outline" size={16} color="#A78BFA" />
           </TouchableOpacity>
         </View>
 
@@ -184,9 +200,10 @@ export default function ProfileScreen() {
           >
             <Ionicons
               name="grid"
-              size={24}
-              color={selectedTab === 'guides' ? '#0E2954' : '#A0B4C8'}
+              size={20}
+              color={selectedTab === 'guides' ? '#A78BFA' : '#9CA3AF'}
             />
+            <View style={[styles.tabIndicator, selectedTab === 'guides' && styles.tabIndicatorActive]} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, selectedTab === 'saved' && styles.tabActive]}
@@ -194,9 +211,10 @@ export default function ProfileScreen() {
           >
             <Ionicons
               name="bookmark"
-              size={24}
-              color={selectedTab === 'saved' ? '#0E2954' : '#A0B4C8'}
+              size={20}
+              color={selectedTab === 'saved' ? '#A78BFA' : '#9CA3AF'}
             />
+            <View style={[styles.tabIndicator, selectedTab === 'saved' && styles.tabIndicatorActive]} />
           </TouchableOpacity>
         </View>
 
@@ -204,8 +222,10 @@ export default function ProfileScreen() {
           <View style={styles.gridContainer}>
             {guides.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="images-outline" size={80} color="#E8F1F8" />
-                <Text style={styles.emptyTitle}>No Guides Yet</Text>
+                <View style={styles.emptyIconCircle}>
+                  <Ionicons name="images-outline" size={64} color="#C4B5FD" />
+                </View>
+                <Text style={styles.emptyTitle}>No Trips Yet</Text>
                 <Text style={styles.emptySubtitle}>
                   Share your travel experiences with the community
                 </Text>
@@ -221,14 +241,17 @@ export default function ProfileScreen() {
                     }}
                     style={styles.gridImage}
                   />
-                  <View style={styles.gridOverlay}>
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.5)']}
+                    style={styles.gridOverlay}
+                  >
                     <View style={styles.gridStats}>
                       <View style={styles.gridStat}>
-                        <Ionicons name="heart" size={16} color="#FFFFFF" />
+                        <Ionicons name="heart" size={14} color="#FFFFFF" />
                         <Text style={styles.gridStatText}>{guide.likesCount || 0}</Text>
                       </View>
                     </View>
-                  </View>
+                  </LinearGradient>
                 </TouchableOpacity>
               ))
             )}
@@ -237,11 +260,32 @@ export default function ProfileScreen() {
 
         {selectedTab === 'saved' && (
           <View style={styles.emptyState}>
-            <Ionicons name="bookmark-outline" size={80} color="#E8F1F8" />
-            <Text style={styles.emptyTitle}>No Saved Guides</Text>
-            <Text style={styles.emptySubtitle}>Save guides to view them later</Text>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons name="bookmark-outline" size={64} color="#C4B5FD" />
+            </View>
+            <Text style={styles.emptyTitle}>No Saved Trips</Text>
+            <Text style={styles.emptySubtitle}>Save trips to view them later</Text>
           </View>
         )}
+
+        <View style={styles.menuSection}>
+          <Text style={styles.menuSectionTitle}>Account</Text>
+          {menuItems.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.menuItem}
+              onPress={item.action}
+            >
+              <View style={styles.menuItemLeft}>
+                <View style={[styles.menuIcon, { backgroundColor: `${item.color}15` }]}>
+                  <Ionicons name={item.icon as any} size={20} color={item.color} />
+                </View>
+                <Text style={styles.menuItemText}>{item.label}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
+            </TouchableOpacity>
+          ))}
+        </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -252,120 +296,189 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FAFAFF',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 48,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingTop: 56,
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#F3F4F6',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#0E2954',
+    color: '#1F2937',
+  },
+  lockButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FAF5FF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     flex: 1,
   },
   profileSection: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-  },
-  profileHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
   },
   avatarContainer: {
-    marginRight: 24,
+    position: 'relative',
+    marginBottom: 20,
   },
   avatar: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#A78BFA',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
   avatarPlaceholder: {
-    backgroundColor: '#F5F9FC',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  statsContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  statItem: {
+  editAvatarButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#A78BFA',
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0E2954',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 13,
-    color: '#A0B4C8',
-  },
-  profileInfo: {
-    marginBottom: 16,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
   },
   profileName: {
-    fontSize: 16,
+    fontSize: 24,
     fontWeight: '700',
-    color: '#0E2954',
-    marginBottom: 4,
+    color: '#1F2937',
+    marginBottom: 8,
   },
   profileBio: {
     fontSize: 14,
-    color: '#0E2954',
+    color: '#6B7280',
+    textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 24,
+    paddingHorizontal: 20,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    width: '100%',
+    shadowColor: '#A78BFA',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#F3F4F6',
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   editButton: {
-    backgroundColor: '#F5F9FC',
-    paddingVertical: 10,
-    borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E8F1F8',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FAF5FF',
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#E9D5FF',
+    width: '100%',
   },
   editButtonText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#0E2954',
+    color: '#A78BFA',
   },
   tabsContainer: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#E8F1F8',
+    borderTopColor: '#F3F4F6',
+    marginBottom: 24,
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 16,
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: 'transparent',
+    position: 'relative',
   },
   tabActive: {
-    borderBottomColor: '#0E2954',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: 'transparent',
+  },
+  tabIndicatorActive: {
+    backgroundColor: '#A78BFA',
   },
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 3,
+    paddingHorizontal: 24,
   },
   gridItem: {
     width: GRID_ITEM_SIZE,
     height: GRID_ITEM_SIZE,
     position: 'relative',
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   gridImage: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#F5F9FC',
+    backgroundColor: '#F9FAFB',
   },
   gridOverlay: {
     position: 'absolute',
@@ -373,14 +486,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    opacity: 0,
+    justifyContent: 'flex-end',
+    padding: 8,
   },
   gridStats: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 12,
   },
   gridStat: {
     flexDirection: 'row',
@@ -388,7 +499,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   gridStatText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -399,17 +510,67 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     width: '100%',
   },
+  emptyIconCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#FAF5FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0E2954',
-    marginTop: 24,
+    color: '#1F2937',
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#A0B4C8',
+    color: '#9CA3AF',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  menuSection: {
+    paddingHorizontal: 24,
+    marginTop: 24,
+  },
+  menuSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 16,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    shadowColor: '#A78BFA',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  menuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  menuIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuItemText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
   },
 });

@@ -1,4 +1,3 @@
-// client/app/(tabs)/discover.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -12,6 +11,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/services/firebase';
 import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, setDoc, deleteDoc, updateDoc, increment, onSnapshot } from 'firebase/firestore';
@@ -23,33 +23,12 @@ export default function DiscoverScreen() {
   const [guides, setGuides] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('all');
-  const [selectedTrip, setSelectedTrip] = useState<any>(null);
-  const [comments, setComments] = useState<any[]>([]);
 
   const filters = ['all', 'trending', 'new', 'popular'];
 
   useEffect(() => {
     loadGuides();
   }, [filter]);
-
-  useEffect(() => {
-    if (!selectedTrip) return;
-    
-    const commentsRef = collection(db, 'tripComments');
-    const q = query(
-      commentsRef,
-      where('tripId', '==', selectedTrip.id),
-      orderBy('createdAt', 'desc'),
-      limit(20)
-    );
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const newComments = snapshot.docs.map(doc => doc.data());
-      setComments(newComments);
-    });
-    
-    return () => unsubscribe();
-  }, [selectedTrip]);
 
   const loadGuides = async () => {
     try {
@@ -168,11 +147,16 @@ export default function DiscoverScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FAFAFF" />
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Discover</Text>
-        <Text style={styles.headerSubtitle}>Explore community travel guides</Text>
+        <View>
+          <Text style={styles.greeting}>Explore</Text>
+          <Text style={styles.headerTitle}>Travel Stories</Text>
+        </View>
+        <TouchableOpacity style={styles.searchButton}>
+          <Ionicons name="search" size={20} color="#1F2937" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -186,9 +170,23 @@ export default function DiscoverScreen() {
             style={[styles.filterChip, filter === f && styles.filterChipActive]}
             onPress={() => setFilter(f)}
           >
-            <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </Text>
+            {filter === f && (
+              <LinearGradient
+                colors={['#A78BFA', '#8B5CF6']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.filterGradient}
+              >
+                <Text style={styles.filterTextActive}>
+                  {f.charAt(0).toUpperCase() + f.slice(1)}
+                </Text>
+              </LinearGradient>
+            )}
+            {filter !== f && (
+              <Text style={styles.filterText}>
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </Text>
+            )}
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -206,27 +204,36 @@ export default function DiscoverScreen() {
                   <Image source={{ uri: guide.userAvatar }} style={styles.avatar} />
                 ) : (
                   <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Ionicons name="person" size={20} color="#A0B4C8" />
+                    <Ionicons name="person" size={16} color="#A78BFA" />
                   </View>
                 )}
                 <View>
                   <Text style={styles.userName}>{guide.userName}</Text>
-                  <Text style={styles.timeAgo}>{guide.destination}</Text>
+                  <View style={styles.locationBadge}>
+                    <Ionicons name="location" size={12} color="#9CA3AF" />
+                    <Text style={styles.locationText}>{guide.destination}</Text>
+                  </View>
                 </View>
               </View>
-              <TouchableOpacity>
-                <Ionicons name="ellipsis-horizontal" size={24} color="#A0B4C8" />
+              <TouchableOpacity style={styles.moreButton}>
+                <Ionicons name="ellipsis-horizontal" size={20} color="#9CA3AF" />
               </TouchableOpacity>
             </View>
 
-            <Image
-              source={{
-                uri:
-                  guide.coverImage ||
-                  'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',
-              }}
-              style={styles.guideImage}
-            />
+            <View style={styles.imageContainer}>
+              <Image
+                source={{
+                  uri:
+                    guide.coverImage ||
+                    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',
+                }}
+                style={styles.guideImage}
+              />
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.3)']}
+                style={styles.imageGradient}
+              />
+            </View>
 
             <View style={styles.cardActions}>
               <View style={styles.actionsLeft}>
@@ -236,19 +243,19 @@ export default function DiscoverScreen() {
                 >
                   <Ionicons
                     name={guide.isLiked ? 'heart' : 'heart-outline'}
-                    size={28}
-                    color={guide.isLiked ? '#FF6B6B' : '#0E2954'}
+                    size={24}
+                    color={guide.isLiked ? '#F87171' : '#1F2937'}
                   />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionButton}>
-                  <Ionicons name="chatbubble-outline" size={26} color="#0E2954" />
+                  <Ionicons name="chatbubble-outline" size={22} color="#1F2937" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionButton}>
-                  <Ionicons name="paper-plane-outline" size={26} color="#0E2954" />
+                  <Ionicons name="paper-plane-outline" size={22} color="#1F2937" />
                 </TouchableOpacity>
               </View>
               <TouchableOpacity>
-                <Ionicons name="bookmark-outline" size={26} color="#0E2954" />
+                <Ionicons name="bookmark-outline" size={22} color="#1F2937" />
               </TouchableOpacity>
             </View>
 
@@ -256,10 +263,10 @@ export default function DiscoverScreen() {
               <Text style={styles.likesText}>{guide.likesCount || 0} likes</Text>
               <Text style={styles.guideTitle}>
                 <Text style={styles.guideUserName}>{guide.userName} </Text>
-                {guide.title}
+                {guide.title || 'Amazing travel experience'}
               </Text>
               <Text style={styles.guideDescription} numberOfLines={2}>
-                {guide.description || 'Explore this amazing travel guide'}
+                {guide.description || 'Explore this beautiful destination and create unforgettable memories'}
               </Text>
               <TouchableOpacity>
                 <Text style={styles.viewMore}>View all details</Text>
@@ -267,6 +274,29 @@ export default function DiscoverScreen() {
             </View>
           </View>
         ))}
+
+        <View style={styles.aiInsightCard}>
+          <LinearGradient
+            colors={['#E0E7FF', '#DDD6FE']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.aiInsightGradient}
+          >
+            <View style={styles.aiInsightHeader}>
+              <View style={styles.aiIconCircle}>
+                <Ionicons name="sparkles" size={20} color="#8B5CF6" />
+              </View>
+              <Text style={styles.aiInsightTitle}>AI Travel Tips</Text>
+            </View>
+            <Text style={styles.aiInsightText}>
+              Based on your preferences, we recommend exploring coastal destinations in spring. Perfect weather and fewer crowds!
+            </Text>
+            <TouchableOpacity style={styles.aiInsightButton}>
+              <Text style={styles.aiInsightButtonText}>Explore More</Text>
+              <Ionicons name="arrow-forward" size={16} color="#8B5CF6" />
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -277,62 +307,97 @@ export default function DiscoverScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FAFAFF',
   },
   header: {
-    paddingTop: 48,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 56,
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+  },
+  greeting: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginBottom: 4,
+    fontWeight: '500',
+    letterSpacing: 0.5,
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '700',
-    color: '#0E2954',
-    marginBottom: 4,
+    color: '#1F2937',
+    letterSpacing: -0.5,
   },
-  headerSubtitle: {
-    fontSize: 15,
-    color: '#5DA7DB',
+  searchButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#F3F4F6',
   },
   filtersContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: 24,
+    paddingBottom: 20,
     gap: 12,
   },
   filterChip: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 24,
-    backgroundColor: '#F5F9FC',
-    borderWidth: 1,
-    borderColor: '#E8F1F8',
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#F3F4F6',
     marginRight: 12,
   },
   filterChipActive: {
-    backgroundColor: '#5DA7DB',
-    borderColor: '#5DA7DB',
+    borderWidth: 0,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  filterGradient: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   filterText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0E2954',
+    color: '#6B7280',
   },
   filterTextActive: {
+    fontSize: 14,
+    fontWeight: '700',
     color: '#FFFFFF',
   },
   content: {
     flex: 1,
   },
   guideCard: {
-    marginBottom: 24,
+    marginBottom: 32,
     backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    marginHorizontal: 24,
+    shadowColor: '#A78BFA',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
+    overflow: 'hidden',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
   },
   userInfo: {
     flexDirection: 'row',
@@ -343,25 +408,52 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#F3F4F6',
   },
   avatarPlaceholder: {
-    backgroundColor: '#F5F9FC',
+    backgroundColor: '#FAF5FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   userName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#0E2954',
+    color: '#1F2937',
+    marginBottom: 2,
   },
-  timeAgo: {
+  locationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  locationText: {
     fontSize: 12,
-    color: '#A0B4C8',
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  moreButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageContainer: {
+    width: '100%',
+    height: width - 48,
+    position: 'relative',
   },
   guideImage: {
-    width: width,
-    height: width * 1.1,
-    backgroundColor: '#F5F9FC',
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F9FAFB',
+  },
+  imageGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
   },
   cardActions: {
     flexDirection: 'row',
@@ -378,31 +470,82 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   cardContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   likesText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#0E2954',
-    marginBottom: 4,
+    color: '#1F2937',
+    marginBottom: 8,
   },
   guideTitle: {
     fontSize: 14,
-    color: '#0E2954',
-    marginBottom: 4,
+    color: '#1F2937',
+    marginBottom: 8,
+    lineHeight: 20,
   },
   guideUserName: {
     fontWeight: '700',
   },
   guideDescription: {
     fontSize: 14,
-    color: '#A0B4C8',
+    color: '#6B7280',
     lineHeight: 20,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   viewMore: {
     fontSize: 13,
-    color: '#5DA7DB',
+    color: '#A78BFA',
     fontWeight: '600',
+  },
+  aiInsightCard: {
+    marginHorizontal: 24,
+    marginBottom: 24,
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  aiInsightGradient: {
+    padding: 24,
+  },
+  aiInsightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  aiIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiInsightTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  aiInsightText: {
+    fontSize: 14,
+    color: '#4B5563',
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  aiInsightButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aiInsightButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#8B5CF6',
   },
 });
