@@ -1,551 +1,605 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   Image,
-  StatusBar,
   StyleSheet,
   Dimensions,
-  RefreshControl,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/services/firebase';
-import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, setDoc, deleteDoc, updateDoc, increment, onSnapshot } from 'firebase/firestore';
 
 const { width } = Dimensions.get('window');
+const CARD_WIDTH = (width - 52) / 2; // 20px padding left + 20px padding right + 12px gap
 
-export default function DiscoverScreen() {
-  const { user } = useAuth();
-  const [guides, setGuides] = useState<any[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState('all');
+const travelCategories = [
+  {
+    id: 1,
+    name: "Beaches",
+    icon: "🌊",
+    image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80",
+    count: 45,
+    gradient: ['#06beb6', '#48b1bf']
+  },
+  {
+    id: 2,
+    name: "Hill Stations",
+    icon: "🏔️",
+    image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80",
+    count: 67,
+    gradient: ['#667eea', '#764ba2']
+  },
+  {
+    id: 3,
+    name: "Cities",
+    icon: "🏙️",
+    image: "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=800&q=80",
+    count: 38,
+    gradient: ['#f093fb', '#f5576c']
+  },
+  {
+    id: 4,
+    name: "Wellness",
+    icon: "🧘",
+    image: "https://images.unsplash.com/photo-1545389336-cf090694435e?w=800&q=80",
+    count: 29,
+    gradient: ['#4facfe', '#00f2fe']
+  },
+  {
+    id: 5,
+    name: "Culture",
+    icon: "🎭",
+    image: "https://images.unsplash.com/photo-1548013146-72479768bada?w=800&q=80",
+    count: 52,
+    gradient: ['#fa709a', '#fee140']
+  },
+  {
+    id: 6,
+    name: "Wildlife",
+    icon: "🦁",
+    image: "https://images.unsplash.com/photo-1549366021-9f761d450615?w=800&q=80",
+    count: 34,
+    gradient: ['#30cfd0', '#330867']
+  },
+  {
+    id: 7,
+    name: "Food Tours",
+    icon: "🍜",
+    image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&q=80",
+    count: 41,
+    gradient: ['#fdbb2d', '#22c1c3']
+  },
+  {
+    id: 8,
+    name: "Road Trips",
+    icon: "🚗",
+    image: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&q=80",
+    count: 56,
+    gradient: ['#ee0979', '#ff6a00']
+  }
+];
 
-  const filters = ['all', 'trending', 'new', 'popular'];
+const regions = [
+  {
+    id: 1,
+    name: "North India",
+    image: "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=800&q=80",
+    places: 128
+  },
+  {
+    id: 2,
+    name: "South India",
+    image: "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=800&q=80",
+    places: 156
+  },
+  {
+    id: 3,
+    name: "North-East India",
+    image: "https://images.unsplash.com/photo-1562979314-bee7453e911c?w=800&q=80",
+    places: 87
+  },
+  {
+    id: 4,
+    name: "International",
+    image: "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800&q=80",
+    places: 243
+  }
+];
 
-  useEffect(() => {
-    loadGuides();
-  }, [filter]);
+const curatedCollections = [
+  {
+    id: 1,
+    title: "Best Monsoon Trips 🍃",
+    subtitle: "Embrace the rain",
+    image: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&q=80",
+    count: 24
+  },
+  {
+    id: 2,
+    title: "Budget-Friendly Under ₹5,000",
+    subtitle: "Travel without breaking the bank",
+    image: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=800&q=80",
+    count: 32
+  },
+  {
+    id: 3,
+    title: "Perfect 2-Day Road Trips",
+    subtitle: "Weekend escapes",
+    image: "https://images.unsplash.com/photo-1533587851505-d119e13fa0d7?w=800&q=80",
+    count: 18
+  },
+  {
+    id: 4,
+    title: "Luxury Escapes",
+    subtitle: "Indulge yourself",
+    image: "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80",
+    count: 15
+  },
+  {
+    id: 5,
+    title: "Slow Travel Picks",
+    subtitle: "Take your time",
+    image: "https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=800&q=80",
+    count: 21
+  }
+];
 
-  const loadGuides = async () => {
-    try {
-      let q;
-      const tripsRef = collection(db, 'trips');
+const popularDestinations = [
+  {
+    id: 1,
+    name: "Goa",
+    image: "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=800&q=80",
+    country: "India",
+    trending: true
+  },
+  {
+    id: 2,
+    name: "Manali",
+    image: "https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?w=800&q=80",
+    country: "India",
+    trending: false
+  },
+  {
+    id: 3,
+    name: "Jaipur",
+    image: "https://images.unsplash.com/photo-1599661046289-e31897846e41?w=800&q=80",
+    country: "India",
+    trending: true
+  },
+  {
+    id: 4,
+    name: "Kerala Backwaters",
+    image: "https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?w=800&q=80",
+    country: "India",
+    trending: false
+  },
+  {
+    id: 5,
+    name: "Rishikesh",
+    image: "https://images.unsplash.com/photo-1626509653291-18d9845ab6c8?w=800&q=80",
+    country: "India",
+    trending: true
+  },
+  {
+    id: 6,
+    name: "Udaipur",
+    image: "https://images.unsplash.com/photo-1599661046827-dacff0c0f09f?w=800&q=80",
+    country: "India",
+    trending: false
+  }
+];
 
-      if (filter === 'trending') {
-        q = query(
-          tripsRef,
-          where('isPublic', '==', true),
-          orderBy('likesCount', 'desc'),
-          limit(20)
-        );
-      } else if (filter === 'new') {
-        q = query(
-          tripsRef,
-          where('isPublic', '==', true),
-          orderBy('createdAt', 'desc'),
-          limit(20)
-        );
-      } else if (filter === 'popular') {
-        q = query(
-          tripsRef,
-          where('isPublic', '==', true),
-          where('likesCount', '>=', 5),
-          orderBy('likesCount', 'desc'),
-          limit(20)
-        );
-      } else {
-        q = query(
-          tripsRef,
-          where('isPublic', '==', true),
-          orderBy('createdAt', 'desc'),
-          limit(20)
-        );
-      }
+const eventBasedDiscovery = [
+  {
+    id: 1,
+    title: "Winter Festivals",
+    icon: "❄️",
+    image: "https://images.unsplash.com/photo-1483086431886-3590a88317fe?w=800&q=80",
+    month: "Dec - Feb"
+  },
+  {
+    id: 2,
+    title: "Summer Treks",
+    icon: "⛰️",
+    image: "https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80",
+    month: "May - Jul"
+  },
+  {
+    id: 3,
+    title: "Cherry Blossom Spots",
+    icon: "🌸",
+    image: "https://images.unsplash.com/photo-1522383225653-ed111181a951?w=800&q=80",
+    month: "Mar - Apr"
+  },
+  {
+    id: 4,
+    title: "Music Events",
+    icon: "🎵",
+    image: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800&q=80",
+    month: "Year-round"
+  }
+];
 
-      const snapshot = await getDocs(q);
-      const guidesData = await Promise.all(
-        snapshot.docs.map(async (docSnap) => {
-          const guide = docSnap.data();
-          const userDocRef = doc(db, 'users', guide.userId);
-          const userSnap = await getDoc(userDocRef);
-          const userData = userSnap.data();
+const CategoryCard = ({ category }: { category: typeof travelCategories[0] }) => (
+  <TouchableOpacity style={styles.categoryCard}>
+    <Image source={{ uri: category.image }} style={styles.categoryImage} />
+    <LinearGradient colors={[category.gradient[0] || '#000', category.gradient[1] || '#fff', 'rgba(0,0,0,0.3)']} style={styles.categoryGradient} />
+    <View style={styles.categoryContent}>
+      <Text style={styles.categoryName}>{category.name}</Text>
+      <Text style={styles.categoryCount}>{category.count} destinations</Text>
+    </View>
+  </TouchableOpacity>
+);
 
-          const likesQuery = query(
-            collection(db, 'tripLikes'),
-            where('tripId', '==', docSnap.id),
-            where('userId', '==', user?.id)
-          );
-          const likesSnapshot = await getDocs(likesQuery);
-          const isLiked = !likesSnapshot.empty;
+const RegionCard = ({ region }: { region: typeof regions[0] }) => (
+  <TouchableOpacity style={styles.regionCard}>
+    <Image source={{ uri: region.image }} style={styles.regionImage} />
+    <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={styles.regionGradient} />
+    <View style={styles.regionContent}>
+      <Text style={styles.regionName}>{region.name}</Text>
+      <Text style={styles.regionPlaces}>{region.places} places</Text>
+    </View>
+  </TouchableOpacity>
+);
 
-          return {
-            ...guide,
-            id: docSnap.id,
-            userName: userData?.name || 'Unknown',
-            userAvatar: userData?.profilePicture || null,
-            isLiked,
-          };
-        })
-      );
+const CollectionCard = ({ collection }: { collection: typeof curatedCollections[0] }) => (
+  <TouchableOpacity style={styles.collectionCard}>
+    <Image source={{ uri: collection.image }} style={styles.collectionImage} />
+    <LinearGradient colors={['transparent', 'rgba(0,0,0,0.8)']} style={styles.collectionGradient} />
+    <View style={styles.collectionContent}>
+      <Text style={styles.collectionTitle}>{collection.title}</Text>
+      <Text style={styles.collectionSubtitle}>{collection.subtitle}</Text>
+      <View style={styles.collectionBadge}>
+        <Text style={styles.collectionCount}>{collection.count} trips</Text>
+      </View>
+    </View>
+  </TouchableOpacity>
+);
 
-      setGuides(guidesData);
-    } catch (error) {
-      console.error('Load guides error:', error);
-    }
-  };
+const PopularDestinationCard = ({ destination }: { destination: typeof popularDestinations[0] }) => (
+  <TouchableOpacity style={styles.popularCard}>
+    <Image source={{ uri: destination.image }} style={styles.popularImage} />
+    {destination.trending && (
+      <View style={styles.trendingBadge}>
+        <Ionicons name="trending-up" size={12} color="#fff" />
+        <Text style={styles.trendingText}>Trending</Text>
+      </View>
+    )}
+    <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={styles.popularGradient} />
+    <View style={styles.popularContent}>
+      <Text style={styles.popularName}>{destination.name}</Text>
+      <Text style={styles.popularCountry}>{destination.country}</Text>
+    </View>
+  </TouchableOpacity>
+);
 
-  const handleLike = async (guideId: string, isLiked: boolean) => {
-    try {
-      const likeId = `${user?.id}_${guideId}`;
-      const likeRef = doc(db, 'tripLikes', likeId);
+const EventCard = ({ event }: { event: typeof eventBasedDiscovery[0] }) => (
+  <TouchableOpacity style={styles.eventCard}>
+    <Image source={{ uri: event.image }} style={styles.eventImage} />
+    <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={styles.eventGradient} />
+    <View style={styles.eventContent}>
+      <Text style={styles.eventIcon}>{event.icon}</Text>
+      <Text style={styles.eventTitle}>{event.title}</Text>
+      <Text style={styles.eventMonth}>{event.month}</Text>
+    </View>
+  </TouchableOpacity>
+);
 
-      if (isLiked) {
-        await deleteDoc(likeRef);
-        const tripRef = doc(db, 'trips', guideId);
-        await updateDoc(tripRef, {
-          likesCount: increment(-1),
-        });
-      } else {
-        await setDoc(likeRef, {
-          userId: user?.id,
-          tripId: guideId,
-          createdAt: new Date().toISOString(),
-        });
-        const tripRef = doc(db, 'trips', guideId);
-        await updateDoc(tripRef, {
-          likesCount: increment(1),
-        });
-      }
+const SectionHeader = ({ title, subtitle, action }: { title: string; subtitle?: string; action?: boolean }) => (
+  <View style={styles.sectionHeader}>
+    <View>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
+    </View>
+    {action && (
+      <TouchableOpacity>
+        <Text style={styles.seeAll}>See All</Text>
+      </TouchableOpacity>
+    )}
+  </View>
+);
 
-      setGuides((prev) =>
-        prev.map((guide) =>
-          guide.id === guideId
-            ? {
-                ...guide,
-                isLiked: !isLiked,
-                likesCount: isLiked
-                  ? (guide.likesCount || 1) - 1
-                  : (guide.likesCount || 0) + 1,
-              }
-            : guide
-        )
-      );
-    } catch (error) {
-      console.error('Like error:', error);
-    }
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadGuides();
-    setRefreshing(false);
-  };
+const DiscoverTab = () => {
+  const [activeTab, setActiveTab] = useState('categories');
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FAFAFF" />
-
+      <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Explore</Text>
-          <Text style={styles.headerTitle}>Travel Stories</Text>
+          <Text style={styles.headerTitle}>Discover</Text>
+          <Text style={styles.headerSubtitle}>Browse all travel possibilities</Text>
         </View>
-        <TouchableOpacity style={styles.searchButton}>
-          <Ionicons name="search" size={20} color="#1F2937" />
+        <TouchableOpacity style={styles.mapButton}>
+          <Ionicons name="map-outline" size={22} color="#1a1a1a" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filtersContainer}
-      >
-        {filters.map((f) => (
-          <TouchableOpacity
-            key={f}
-            style={[styles.filterChip, filter === f && styles.filterChipActive]}
-            onPress={() => setFilter(f)}
-          >
-            {filter === f && (
-              <LinearGradient
-                colors={['#A78BFA', '#8B5CF6']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.filterGradient}
-              >
-                <Text style={styles.filterTextActive}>
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
-                </Text>
-              </LinearGradient>
-            )}
-            {filter !== f && (
-              <Text style={styles.filterText}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </Text>
-            )}
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'categories' && styles.tabActive]}
+          onPress={() => setActiveTab('categories')}
+        >
+          <Text style={[styles.tabText, activeTab === 'categories' && styles.tabTextActive]}>Categories</Text>
+        </TouchableOpacity>
 
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      >
-        {guides.map((guide) => (
-          <View key={guide.id} style={styles.guideCard}>
-            <View style={styles.cardHeader}>
-              <View style={styles.userInfo}>
-                {guide.userAvatar ? (
-                  <Image source={{ uri: guide.userAvatar }} style={styles.avatar} />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Ionicons name="person" size={16} color="#A78BFA" />
-                  </View>
-                )}
-                <View>
-                  <Text style={styles.userName}>{guide.userName}</Text>
-                  <View style={styles.locationBadge}>
-                    <Ionicons name="location" size={12} color="#9CA3AF" />
-                    <Text style={styles.locationText}>{guide.destination}</Text>
-                  </View>
-                </View>
-              </View>
-              <TouchableOpacity style={styles.moreButton}>
-                <Ionicons name="ellipsis-horizontal" size={20} color="#9CA3AF" />
-              </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'regions' && styles.tabActive]}
+          onPress={() => setActiveTab('regions')}
+        >
+          <Text style={[styles.tabText, activeTab === 'regions' && styles.tabTextActive]}>Regions</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'collections' && styles.tabActive]}
+          onPress={() => setActiveTab('collections')}
+        >
+          <Text style={[styles.tabText, activeTab === 'collections' && styles.tabTextActive]}>Collections</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {activeTab === 'categories' && (
+          <>
+            <SectionHeader title="Travel Categories" subtitle="Explore by interest" />
+            <View style={styles.categoryGrid}>
+              {travelCategories.map((category) => (
+                <CategoryCard key={category.id} category={category} />
+              ))}
             </View>
 
-            <View style={styles.imageContainer}>
-              <Image
-                source={{
-                  uri:
-                    guide.coverImage ||
-                    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',
-                }}
-                style={styles.guideImage}
-              />
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.3)']}
-                style={styles.imageGradient}
-              />
+            <SectionHeader title="Popular Destinations" subtitle="Trending this month" action />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+              {popularDestinations.map((destination) => (
+                <PopularDestinationCard key={destination.id} destination={destination} />
+              ))}
+            </ScrollView>
+
+            <SectionHeader title="Event-Based Discovery" subtitle="Plan around experiences" />
+            <View style={styles.eventGrid}>
+              {eventBasedDiscovery.map((event) => (
+                <EventCard key={event.id} event={event} />
+              ))}
+            </View>
+          </>
+        )}
+
+        {activeTab === 'regions' && (
+          <>
+            <SectionHeader title="Browse by Region" subtitle="Discover by location" />
+            <View style={styles.regionGrid}>
+              {regions.map((region) => (
+                <RegionCard key={region.id} region={region} />
+              ))}
             </View>
 
-            <View style={styles.cardActions}>
-              <View style={styles.actionsLeft}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => handleLike(guide.id, guide.isLiked)}
-                >
-                  <Ionicons
-                    name={guide.isLiked ? 'heart' : 'heart-outline'}
-                    size={24}
-                    color={guide.isLiked ? '#F87171' : '#1F2937'}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton}>
-                  <Ionicons name="chatbubble-outline" size={22} color="#1F2937" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton}>
-                  <Ionicons name="paper-plane-outline" size={22} color="#1F2937" />
+            <View style={styles.mapCard}>
+              <View style={styles.mapCardContent}>
+                <Ionicons name="location" size={32} color="#667eea" />
+                <Text style={styles.mapCardTitle}>Near You</Text>
+                <Text style={styles.mapCardText}>Discover destinations around you</Text>
+
+                <TouchableOpacity style={styles.mapCardButton}>
+                  <Text style={styles.mapCardButtonText}>View Map</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#fff" />
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity>
-                <Ionicons name="bookmark-outline" size={22} color="#1F2937" />
-              </TouchableOpacity>
             </View>
+          </>
+        )}
 
-            <View style={styles.cardContent}>
-              <Text style={styles.likesText}>{guide.likesCount || 0} likes</Text>
-              <Text style={styles.guideTitle}>
-                <Text style={styles.guideUserName}>{guide.userName} </Text>
-                {guide.title || 'Amazing travel experience'}
+        {activeTab === 'collections' && (
+          <>
+            <SectionHeader title="Curated Collections" subtitle="Handpicked journeys" />
+            {curatedCollections.map((collection) => (
+              <CollectionCard key={collection.id} collection={collection} />
+            ))}
+
+            <View style={styles.infoCard}>
+              <Ionicons name="information-circle" size={24} color="#667eea" />
+              <Text style={styles.infoText}>
+                Collections are carefully curated by travel experts and our community
               </Text>
-              <Text style={styles.guideDescription} numberOfLines={2}>
-                {guide.description || 'Explore this beautiful destination and create unforgettable memories'}
-              </Text>
-              <TouchableOpacity>
-                <Text style={styles.viewMore}>View all details</Text>
-              </TouchableOpacity>
             </View>
-          </View>
-        ))}
-
-        <View style={styles.aiInsightCard}>
-          <LinearGradient
-            colors={['#E0E7FF', '#DDD6FE']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.aiInsightGradient}
-          >
-            <View style={styles.aiInsightHeader}>
-              <View style={styles.aiIconCircle}>
-                <Ionicons name="sparkles" size={20} color="#8B5CF6" />
-              </View>
-              <Text style={styles.aiInsightTitle}>AI Travel Tips</Text>
-            </View>
-            <Text style={styles.aiInsightText}>
-              Based on your preferences, we recommend exploring coastal destinations in spring. Perfect weather and fewer crowds!
-            </Text>
-            <TouchableOpacity style={styles.aiInsightButton}>
-              <Text style={styles.aiInsightButtonText}>Explore More</Text>
-              <Ionicons name="arrow-forward" size={16} color="#8B5CF6" />
-            </TouchableOpacity>
-          </LinearGradient>
-        </View>
-
-        <View style={{ height: 100 }} />
+          </>
+        )}
       </ScrollView>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FAFAFF',
-  },
+  container: { flex: 1, backgroundColor: '#fafafa' },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
     paddingTop: 56,
-    paddingHorizontal: 24,
     paddingBottom: 20,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
-  greeting: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    marginBottom: 4,
-    fontWeight: '500',
-    letterSpacing: 0.5,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1F2937',
-    letterSpacing: -0.5,
-  },
-  searchButton: {
+  headerTitle: { fontSize: 32, fontWeight: '700', color: '#1a1a1a', marginBottom: 4 },
+  headerSubtitle: { fontSize: 14, color: '#666' },
+  mapButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#F3F4F6',
   },
-  filtersContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 20,
+  tabBar: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
     gap: 12,
   },
-  filterChip: {
+  tab: {
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#F3F4F6',
-    marginRight: 12,
+    backgroundColor: '#f5f5f5',
   },
-  filterChipActive: {
-    borderWidth: 0,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  filterGradient: {
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filterText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  filterTextActive: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  content: {
-    flex: 1,
-  },
-  guideCard: {
-    marginBottom: 32,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    marginHorizontal: 24,
-    shadowColor: '#A78BFA',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
-    overflow: 'hidden',
-  },
-  cardHeader: {
+  tabActive: { backgroundColor: '#1a1a1a' },
+  tabText: { fontSize: 14, fontWeight: '600', color: '#666' },
+  tabTextActive: { color: '#fff' },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 100 },
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 16,
   },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  sectionTitle: { fontSize: 22, fontWeight: '700', color: '#1a1a1a', marginBottom: 4 },
+  sectionSubtitle: { fontSize: 14, color: '#666' },
+  seeAll: { fontSize: 14, fontWeight: '600', color: '#667eea' },
+  categoryGrid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    paddingHorizontal: 20, 
     gap: 12,
+    justifyContent: 'space-between'
   },
-  avatar: {
-    width: 40,
-    height: 40,
+  categoryCard: {
+    width: CARD_WIDTH,
+    height: 180,
     borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#F3F4F6',
+    overflow: 'hidden',
+    backgroundColor: '#fff',
   },
-  avatarPlaceholder: {
-    backgroundColor: '#FAF5FF',
-    justifyContent: 'center',
-    alignItems: 'center',
+  categoryImage: { width: '100%', height: '100%', position: 'absolute' },
+  categoryGradient: { position: 'absolute', width: '100%', height: '100%' },
+  categoryContent: { flex: 1, justifyContent: 'flex-end', padding: 16 },
+  categoryName: { fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 4 },
+  categoryCount: { fontSize: 12, color: '#fff', opacity: 0.9 },
+
+  horizontalScroll: { paddingHorizontal: 20, gap: 12 },
+  popularCard: {
+    width: 140,
+    height: 160,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
   },
-  userName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 2,
-  },
-  locationBadge: {
+  popularImage: { width: '100%', height: '100%', position: 'absolute' },
+  trendingBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#ff6b6b',
+    borderRadius: 12,
+    zIndex: 1,
   },
-  locationText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    fontWeight: '500',
-  },
-  moreButton: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageContainer: {
-    width: '100%',
-    height: width - 48,
-    position: 'relative',
-  },
-  guideImage: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#F9FAFB',
-  },
-  imageGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 100,
-  },
-  cardActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  actionsLeft: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  actionButton: {
-    padding: 4,
-  },
-  cardContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  likesText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  guideTitle: {
-    fontSize: 14,
-    color: '#1F2937',
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  guideUserName: {
-    fontWeight: '700',
-  },
-  guideDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  viewMore: {
-    fontSize: 13,
-    color: '#A78BFA',
-    fontWeight: '600',
-  },
-  aiInsightCard: {
-    marginHorizontal: 24,
-    marginBottom: 24,
-    borderRadius: 24,
+  trendingText: { fontSize: 10, fontWeight: '600', color: '#fff' },
+  popularGradient: { position: 'absolute', width: '100%', height: '100%' },
+  popularContent: { flex: 1, justifyContent: 'flex-end', padding: 12 },
+  popularName: { fontSize: 15, fontWeight: '700', color: '#fff', marginBottom: 2 },
+  popularCountry: { fontSize: 11, color: '#fff', opacity: 0.9 },
+
+  eventGrid: { paddingHorizontal: 20, gap: 12 },
+  eventCard: {
+    height: 140,
+    borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
+    backgroundColor: '#fff',
+    marginBottom: 12,
+  },
+  eventImage: { width: '100%', height: '100%', position: 'absolute' },
+  eventGradient: { position: 'absolute', width: '100%', height: '100%' },
+  eventContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  eventIcon: { fontSize: 40, marginBottom: 8 },
+  eventTitle: { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 4, textAlign: 'center' },
+  eventMonth: { fontSize: 13, color: '#fff', opacity: 0.9 },
+
+  regionGrid: { paddingHorizontal: 20, gap: 12 },
+  regionCard: {
+    height: 200,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+    marginBottom: 12,
+  },
+  regionImage: { width: '100%', height: '100%', position: 'absolute' },
+  regionGradient: { position: 'absolute', width: '100%', height: '100%' },
+  regionContent: { flex: 1, justifyContent: 'flex-end', padding: 20 },
+  regionName: { fontSize: 28, fontWeight: '700', color: '#fff', marginBottom: 4 },
+  regionPlaces: { fontSize: 14, color: '#fff', opacity: 0.9 },
+
+  mapCard: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 4,
   },
-  aiInsightGradient: {
-    padding: 24,
-  },
-  aiInsightHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  aiIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  aiInsightTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  aiInsightText: {
-    fontSize: 14,
-    color: '#4B5563',
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  aiInsightButton: {
+  mapCardContent: { alignItems: 'center' },
+  mapCardTitle: { fontSize: 24, fontWeight: '700', color: '#1a1a1a', marginTop: 12, marginBottom: 8 },
+  mapCardText: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20 },
+  mapCardButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: '#667eea',
+    borderRadius: 16,
   },
-  aiInsightButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#8B5CF6',
+  mapCardButtonText: { fontSize: 15, fontWeight: '600', color: '#fff' },
+
+  collectionCard: {
+    height: 220,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    marginBottom: 16,
   },
+  collectionImage: { width: '100%', height: '100%', position: 'absolute' },
+  collectionGradient: { position: 'absolute', width: '100%', height: '100%' },
+  collectionContent: { flex: 1, justifyContent: 'flex-end', padding: 24 },
+  collectionTitle: { fontSize: 24, fontWeight: '700', color: '#fff', marginBottom: 6 },
+  collectionSubtitle: { fontSize: 15, color: '#fff', opacity: 0.9, marginBottom: 16 },
+  collectionBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 16,
+  },
+  collectionCount: { fontSize: 12, fontWeight: '600', color: '#fff' },
+
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 20,
+    marginTop: 8,
+    padding: 16,
+    backgroundColor: '#f0f4ff',
+    borderRadius: 16,
+  },
+  infoText: { flex: 1, fontSize: 13, color: '#666', lineHeight: 18 },
 });
+
+export default DiscoverTab;

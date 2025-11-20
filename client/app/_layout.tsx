@@ -1,4 +1,5 @@
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { LocationProvider } from '@/contexts/LocationContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
@@ -16,8 +17,8 @@ function RootContent() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a2e' }}>
-        <ActivityIndicator size="large" color="#ff7b54" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0E2954' }}>
+        <ActivityIndicator size="large" color="#5DA7DB" />
       </View>
     );
   }
@@ -37,7 +38,9 @@ function RootContent() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootContent />
+      <LocationProvider>
+        <RootContent />
+      </LocationProvider>
     </AuthProvider>
   );
 }

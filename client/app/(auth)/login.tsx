@@ -14,8 +14,10 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Alert
+  Alert,
+  ImageBackground
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 
 const { width, height } = Dimensions.get('window');
 
@@ -23,21 +25,22 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const { login, googleLogin, loading } = useAuth();
   const router = useRouter();
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   React.useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 800,
+        duration: 1000,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 600,
+        duration: 800,
         useNativeDriver: true,
       }),
     ]).start();
@@ -67,127 +70,148 @@ export default function LoginPage() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <StatusBar barStyle="light-content" backgroundColor="#0E2954" />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      
       <LinearGradient
-        colors={['#0E2954', '#1F4788', '#5DA7DB']}
-        style={styles.gradient}
+        colors={['#e8d8f0', '#f0e8f8', '#d8c8e8']}
+        style={styles.background}
       >
-        <Animated.ScrollView 
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+        <View style={styles.blobContainer}>
+          <LinearGradient
+            colors={['rgba(220, 180, 240, 0.5)', 'rgba(200, 160, 230, 0.4)']}
+            style={[styles.blob, styles.blob1]}
+          />
+          <LinearGradient
+            colors={['rgba(210, 170, 240, 0.4)', 'rgba(180, 140, 220, 0.5)']}
+            style={[styles.blob, styles.blob2]}
+          />
+        </View>
+
+        <KeyboardAvoidingView 
+          style={styles.content}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <Animated.View 
-            style={[
-              styles.logoContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }]
-              }
-            ]}
+          <Animated.ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            style={{
+              opacity: fadeAnim,
+            }}
           >
-            <View style={styles.logoCircle}>
-              <Ionicons name="compass" size={48} color="#FFFFFF" />
-            </View>
-            <Text style={styles.appName}>Itinera</Text>
-            <Text style={styles.tagline}>Plan, Share, Explore</Text>
-          </Animated.View>
+            <Animated.View
+              style={[
+                styles.card,
+                {
+                  transform: [{ translateY: slideAnim }]
+                }
+              ]}
+            >
+              <View style={styles.glassCard}>
+                <Text style={styles.title}>Log into{'\n'}your account</Text>
 
-          <Animated.View 
-            style={[
-              styles.formContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }]
-              }
-            ]}
-          >
-            <Text style={styles.welcomeTitle}>Welcome Back</Text>
-            <Text style={styles.welcomeSubtitle}>Sign in to continue your journey</Text>
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputGlass}>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Username/Email"
+                      placeholderTextColor="rgba(255, 255, 255, 0.6)"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      returnKeyType="next"
+                      editable={!loading}
+                    />
+                  </View>
+                  <View style={styles.inputUnderline} />
+                </View>
 
-            <View style={styles.inputContainer}>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="mail-outline" size={20} color="#5DA7DB" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Email"
-                  placeholderTextColor="#A0B4C8"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  returnKeyType="next"
-                  editable={!loading}
-                />
-              </View>
-            </View>
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputGlass}>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Password"
+                      placeholderTextColor="rgba(255, 255, 255, 0.6)"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry={!showPassword}
+                      returnKeyType="done"
+                      onSubmitEditing={handleLogin}
+                      editable={!loading}
+                    />
+                    <TouchableOpacity 
+                      onPress={() => setShowPassword(!showPassword)}
+                      style={styles.eyeIcon}
+                    >
+                      <Ionicons 
+                        name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                        size={20} 
+                        color="rgba(255, 255, 255, 0.7)" 
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.inputUnderline} />
+                  <TouchableOpacity style={styles.forgotButton}>
+                    <Text style={styles.forgotText}>Forgot?</Text>
+                  </TouchableOpacity>
+                </View>
 
-            <View style={styles.inputContainer}>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="lock-closed-outline" size={20} color="#5DA7DB" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Password"
-                  placeholderTextColor="#A0B4C8"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  returnKeyType="done"
-                  onSubmitEditing={handleLogin}
-                  editable={!loading}
-                />
                 <TouchableOpacity 
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeIcon}
+                  style={styles.rememberContainer}
+                  onPress={() => setRememberMe(!rememberMe)}
                 >
-                  <Ionicons 
-                    name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                    size={20} 
-                    color="#5DA7DB" 
-                  />
+                  <View style={styles.checkbox}>
+                    {rememberMe && (
+                      <Ionicons name="checkmark" size={16} color="#ffffff" />
+                    )}
+                  </View>
+                  <Text style={styles.rememberText}>Remember me</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.loginButton} 
+                  onPress={handleLogin} 
+                  disabled={loading}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={['#2d2d2d', '#1a1a1a']}
+                    style={styles.loginGradient}
+                  >
+                    <Text style={styles.loginButtonText}>
+                      {loading ? 'Logging In...' : 'Log In'}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  onPress={handleGoogleLogin} 
+                  style={styles.googleButton}
+                  disabled={loading}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.googleButtonContent}>
+                    <Ionicons name="logo-google" size={20} color="#2d2d2d" />
+                    <Text style={styles.googleButtonText}>Log in with Google</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <View style={styles.signUpContainer}>
+                  <Text style={styles.signUpText}>Don't have an account? </Text>
+                  <Link href="/(auth)/signup" asChild>
+                    <TouchableOpacity>
+                      <Text style={styles.signUpLink}>Sign Up</Text>
+                    </TouchableOpacity>
+                  </Link>
+                </View>
               </View>
-            </View>
-
-            <TouchableOpacity style={styles.signInButton} onPress={handleLogin} disabled={loading}>
-              <LinearGradient
-                colors={['#5DA7DB', '#1F4788']}
-                start={[0, 0]}
-                end={[1, 0]}
-                style={[styles.signInGradient, loading && { opacity: 0.6 }]}
-              >
-                <Text style={styles.signInText}>{loading ? 'Signing In...' : 'Sign In'}</Text>
-                <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <View style={styles.dividerContainer}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.divider} />
-            </View>
-
-            <TouchableOpacity onPress={handleGoogleLogin} style={styles.googleButton} disabled={loading}>
-              <Ionicons name="logo-google" size={20} color="#5DA7DB" />
-              <Text style={styles.googleText}>Continue with Google</Text>
-            </TouchableOpacity>
-
-            <View style={styles.signUpContainer}>
-              <Text style={styles.signUpText}>Don't have an account? </Text>
-              <Link href="/(auth)/signup" asChild>
-                <TouchableOpacity>
-                  <Text style={styles.signUpLink}>Sign Up</Text>
-                </TouchableOpacity>
-              </Link>
-            </View>
-          </Animated.View>
-        </Animated.ScrollView>
+            </Animated.View>
+          </Animated.ScrollView>
+        </KeyboardAvoidingView>
       </LinearGradient>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -195,140 +219,158 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  gradient: {
+  background: {
+    flex: 1,
+  },
+  blobContainer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  blob: {
+    position: 'absolute',
+    borderRadius: 1000,
+  },
+  blob1: {
+    width: 400,
+    height: 400,
+    top: -100,
+    right: -100,
+  },
+  blob2: {
+    width: 350,
+    height: 350,
+    bottom: -50,
+    left: -80,
+  },
+  content: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+    justifyContent: 'center',
     paddingHorizontal: 24,
     paddingTop: Platform.OS === 'ios' ? 80 : 60,
     paddingBottom: 40,
-    justifyContent: 'center',
   },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 48,
+  card: {
+    width: '100%',
   },
-  logoCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 2,
+  glassCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 30,
+    padding: 32,
+    borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  appName: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 8,
-    letterSpacing: 2,
-  },
-  tagline: {
-    fontSize: 16,
-    color: '#E8F1F8',
-    letterSpacing: 1,
-  },
-  formContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 32,
-    padding: 28,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
+    shadowOpacity: 0.1,
+    shadowRadius: 30,
     elevation: 10,
   },
-  welcomeTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#0E2954',
-    marginBottom: 8,
-  },
-  welcomeSubtitle: {
-    fontSize: 15,
-    color: '#5DA7DB',
-    marginBottom: 32,
+  title: {
+    fontSize: 32,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 40,
+    lineHeight: 38,
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
-  inputWrapper: {
+  inputGlass: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F9FC',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 16,
-    paddingHorizontal: 16,
-    height: 56,
-    borderWidth: 2,
-    borderColor: '#E8F1F8',
-  },
-  inputIcon: {
-    marginRight: 12,
+    paddingHorizontal: 20,
+    height: 54,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   textInput: {
     flex: 1,
-    color: '#0E2954',
-    fontSize: 16,
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  inputUnderline: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginTop: 8,
   },
   eyeIcon: {
     padding: 4,
   },
-  signInButton: {
-    marginBottom: 24,
+  forgotButton: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+  },
+  forgotText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  rememberContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  rememberText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  loginButton: {
+    marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#5DA7DB',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 5,
   },
-  signInGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  loginGradient: {
+    height: 54,
     justifyContent: 'center',
-    height: 56,
-    gap: 8,
+    alignItems: 'center',
   },
-  signInText: {
-    color: '#FFFFFF',
-    fontSize: 17,
+  loginButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
     fontWeight: '600',
   },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E8F1F8',
-  },
-  dividerText: {
-    color: '#A0B4C8',
-    fontSize: 14,
-    marginHorizontal: 16,
-  },
   googleButton: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    height: 54,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  googleButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    height: 56,
-    borderRadius: 16,
-    marginBottom: 24,
-    borderWidth: 2,
-    borderColor: '#E8F1F8',
-    gap: 12,
+    gap: 10,
   },
-  googleText: {
-    color: '#0E2954',
-    fontSize: 16,
+  googleButtonText: {
+    color: '#2d2d2d',
+    fontSize: 15,
     fontWeight: '600',
   },
   signUpContainer: {
@@ -337,12 +379,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   signUpText: {
-    color: '#A0B4C8',
-    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
   },
   signUpLink: {
-    color: '#5DA7DB',
-    fontSize: 15,
+    color: '#ffffff',
+    fontSize: 14,
     fontWeight: '700',
   },
 });

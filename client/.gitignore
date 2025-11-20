@@ -4,6 +4,7 @@
 node_modules/
 .env.example
 .env
+node_modules
 
 # Expo
 .expo/

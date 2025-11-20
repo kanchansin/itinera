@@ -22,6 +22,7 @@ import { doc, setDoc, updateDoc, getDoc, serverTimestamp } from 'firebase/firest
 
 const { width } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:5000/api';
+const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
 
 const travelModes = [
   { id: 'driving', icon: 'car', label: 'Car' },
@@ -41,15 +42,12 @@ interface Stop {
   };
 }
 
-interface LocationSuggestion {
+interface PlaceSuggestion {
   place_id: string;
-  name: string;
-  formatted_address: string;
-  geometry: {
-    location: {
-      lat: number;
-      lng: number;
-    };
+  description: string;
+  structured_formatting: {
+    main_text: string;
+    secondary_text: string;
   };
 }
 
@@ -67,8 +65,8 @@ export default function CreateTripScreen() {
   const [destinations, setDestinations] = useState<Stop[]>(existingTrip?.stops || []);
   const [newDestination, setNewDestination] = useState('');
   const [mapRoute, setMapRoute] = useState<Array<{ latitude: number; longitude: number }>>([]);
-  const [startSuggestions, setStartSuggestions] = useState<LocationSuggestion[]>([]);
-  const [destSuggestions, setDestSuggestions] = useState<LocationSuggestion[]>([]);
+  const [startSuggestions, setStartSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [destSuggestions, setDestSuggestions] = useState<PlaceSuggestion[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -76,6 +74,8 @@ export default function CreateTripScreen() {
     existingTrip?.stops?.[0]?.location || null
   );
   const [tripTitle, setTripTitle] = useState(existingTrip?.tripName || '');
+  const [showStartSuggestions, setShowStartSuggestions] = useState(false);
+  const [showDestSuggestions, setShowDestSuggestions] = useState(false);
 
   const totalSteps = 4;
 
@@ -85,58 +85,107 @@ export default function CreateTripScreen() {
     }
   }, [destinations, selectedMode, startCoords]);
 
-  const searchLocations = async (query: string, isStart: boolean) => {
+  const searchPlacesAutocomplete = async (query: string, isStart: boolean) => {
     if (query.length < 3) {
-      if (isStart) setStartSuggestions([]);
-      else setDestSuggestions([]);
+      if (isStart) {
+        setStartSuggestions([]);
+        setShowStartSuggestions(false);
+      } else {
+        setDestSuggestions([]);
+        setShowDestSuggestions(false);
+      }
       return;
     }
 
     setLoadingSuggestions(true);
     try {
-      const response = await axios.get(`${API_URL}/destinations/search`, {
-        params: { query },
-      });
+      const response = await axios.get(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json`,
+        {
+          params: {
+            input: query,
+            key: GOOGLE_PLACES_API_KEY,
+            types: 'establishment|geocode',
+          },
+        }
+      );
 
-      const suggestions = response.data.external || [];
-      if (isStart) {
-        setStartSuggestions(suggestions);
-      } else {
-        setDestSuggestions(suggestions);
+      if (response.data.status === 'OK') {
+        const suggestions = response.data.predictions || [];
+        if (isStart) {
+          setStartSuggestions(suggestions);
+          setShowStartSuggestions(true);
+        } else {
+          setDestSuggestions(suggestions);
+          setShowDestSuggestions(true);
+        }
+      } else if (response.data.status === 'REQUEST_DENIED') {
+        Alert.alert('Error', 'Google Places API access denied. Please check your API key.');
       }
     } catch (error) {
-      console.error('Search error:', error);
+      console.error('Autocomplete error:', error);
+      Alert.alert('Error', 'Failed to fetch location suggestions');
     } finally {
       setLoadingSuggestions(false);
     }
   };
 
-  const selectStartLocation = (suggestion: LocationSuggestion) => {
-    setStartLocation(suggestion.name);
-    setStartCoords({
-      latitude: suggestion.geometry.location.lat,
-      longitude: suggestion.geometry.location.lng,
-    });
-    setStartSuggestions([]);
+  const getPlaceDetails = async (placeId: string) => {
+    try {
+      const response = await axios.get(
+        `https://maps.googleapis.com/maps/api/place/details/json`,
+        {
+          params: {
+            place_id: placeId,
+            key: GOOGLE_PLACES_API_KEY,
+            fields: 'name,formatted_address,geometry',
+          },
+        }
+      );
+
+      if (response.data.status === 'OK') {
+        return response.data.result;
+      } else {
+        throw new Error('Failed to get place details');
+      }
+    } catch (error) {
+      console.error('Place details error:', error);
+      throw error;
+    }
   };
 
-  const selectDestination = (suggestion: LocationSuggestion) => {
-    const newDest: Stop = {
-      id: Date.now(),
-      name: suggestion.name,
-      location: {
-        latitude: suggestion.geometry.location.lat,
-        longitude: suggestion.geometry.location.lng,
-      },
-    };
-    setDestinations([...destinations, newDest]);
-    setNewDestination('');
-    setDestSuggestions([]);
+  const selectStartLocation = async (suggestion: PlaceSuggestion) => {
+    try {
+      const placeDetails = await getPlaceDetails(suggestion.place_id);
+      setStartLocation(placeDetails.name);
+      setStartCoords({
+        latitude: placeDetails.geometry.location.lat,
+        longitude: placeDetails.geometry.location.lng,
+      });
+      setShowStartSuggestions(false);
+      setStartSuggestions([]);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to select location');
+    }
   };
 
-  const addDestination = () => {
-    if (newDestination.trim() && destSuggestions.length > 0) {
-      selectDestination(destSuggestions[0]);
+  const selectDestination = async (suggestion: PlaceSuggestion) => {
+    try {
+      const placeDetails = await getPlaceDetails(suggestion.place_id);
+      const newDest: Stop = {
+        id: Date.now(),
+        name: placeDetails.name,
+        location: {
+          latitude: placeDetails.geometry.location.lat,
+          longitude: placeDetails.geometry.location.lng,
+        },
+      };
+      setDestinations([...destinations, newDest]);
+      setNewDestination('');
+      setShowDestSuggestions(false);
+      setDestSuggestions([]);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add destination');
     }
   };
 
@@ -308,6 +357,7 @@ export default function CreateTripScreen() {
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
+        keyboardShouldPersistTaps="handled"
       >
         {currentStep === 1 && (
           <View style={styles.stepCard}>
@@ -339,16 +389,24 @@ export default function CreateTripScreen() {
                 <Ionicons name="pin" size={20} color="#5DA7DB" />
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter your starting point"
+                  placeholder="Search for starting point"
                   placeholderTextColor="#A0B4C8"
                   value={startLocation}
                   onChangeText={(text) => {
                     setStartLocation(text);
-                    searchLocations(text, true);
+                    searchPlacesAutocomplete(text, true);
+                  }}
+                  onFocus={() => {
+                    if (startSuggestions.length > 0) {
+                      setShowStartSuggestions(true);
+                    }
                   }}
                 />
+                {loadingSuggestions && (
+                  <ActivityIndicator size="small" color="#5DA7DB" />
+                )}
               </View>
-              {startSuggestions.length > 0 && (
+              {showStartSuggestions && startSuggestions.length > 0 && (
                 <View style={styles.suggestionsContainer}>
                   {startSuggestions.map((suggestion) => (
                     <TouchableOpacity
@@ -358,8 +416,12 @@ export default function CreateTripScreen() {
                     >
                       <Ionicons name="location" size={16} color="#5DA7DB" />
                       <View style={styles.suggestionText}>
-                        <Text style={styles.suggestionName}>{suggestion.name}</Text>
-                        <Text style={styles.suggestionAddress}>{suggestion.formatted_address}</Text>
+                        <Text style={styles.suggestionName}>
+                          {suggestion.structured_formatting.main_text}
+                        </Text>
+                        <Text style={styles.suggestionAddress}>
+                          {suggestion.structured_formatting.secondary_text}
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -405,18 +467,20 @@ export default function CreateTripScreen() {
                     value={newDestination}
                     onChangeText={(text) => {
                       setNewDestination(text);
-                      searchLocations(text, false);
+                      searchPlacesAutocomplete(text, false);
+                    }}
+                    onFocus={() => {
+                      if (destSuggestions.length > 0) {
+                        setShowDestSuggestions(true);
+                      }
                     }}
                   />
+                  {loadingSuggestions && (
+                    <ActivityIndicator size="small" color="#5DA7DB" />
+                  )}
                 </View>
-                <TouchableOpacity
-                  style={styles.addButton}
-                  onPress={addDestination}
-                >
-                  <Ionicons name="add" size={24} color="#FFFFFF" />
-                </TouchableOpacity>
               </View>
-              {destSuggestions.length > 0 && (
+              {showDestSuggestions && destSuggestions.length > 0 && (
                 <View style={styles.suggestionsContainer}>
                   {destSuggestions.map((suggestion) => (
                     <TouchableOpacity
@@ -426,8 +490,12 @@ export default function CreateTripScreen() {
                     >
                       <Ionicons name="location" size={16} color="#5DA7DB" />
                       <View style={styles.suggestionText}>
-                        <Text style={styles.suggestionName}>{suggestion.name}</Text>
-                        <Text style={styles.suggestionAddress}>{suggestion.formatted_address}</Text>
+                        <Text style={styles.suggestionName}>
+                          {suggestion.structured_formatting.main_text}
+                        </Text>
+                        <Text style={styles.suggestionAddress}>
+                          {suggestion.structured_formatting.secondary_text}
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -446,14 +514,6 @@ export default function CreateTripScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.destinationName}>{dest.name}</Text>
-                      {dest.estimatedTime && (
-                        <View style={styles.aiTag}>
-                          <Ionicons name="sparkles" size={12} color="#5DA7DB" />
-                          <Text style={styles.aiTagText}>
-                            AI suggests: {dest.estimatedTime}
-                          </Text>
-                        </View>
-                      )}
                     </View>
                     <TouchableOpacity
                       onPress={() => removeDestination(dest.id)}
@@ -844,14 +904,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  addButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: '#5DA7DB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   destinationsList: {
     marginTop: 16,
   },
@@ -883,17 +935,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0E2954',
-    marginBottom: 4,
-  },
-  aiTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  aiTagText: {
-    fontSize: 12,
-    color: '#5DA7DB',
-    fontStyle: 'italic',
   },
   emptyState: {
     alignItems: 'center',

@@ -12,6 +12,7 @@ export const getDirections = async (origin, destination, mode = "driving") => {
         mode,
         key: GOOGLE_MAPS_API_KEY,
       },
+      timeout: 10000,
     })
     return response.data
   } catch (error) {
@@ -27,6 +28,7 @@ export const getPlaceDetails = async (placeId) => {
         place_id: placeId,
         key: GOOGLE_PLACES_API_KEY,
       },
+      timeout: 10000,
     })
     return response.data
   } catch (error) {
@@ -44,6 +46,7 @@ export const getNearbyPlaces = async (latitude, longitude, radius = 5000, type =
         type,
         key: GOOGLE_PLACES_API_KEY,
       },
+      timeout: 10000,
     })
     return response.data
   } catch (error) {
@@ -59,6 +62,7 @@ export const searchPlaces = async (query) => {
         query,
         key: GOOGLE_PLACES_API_KEY,
       },
+      timeout: 10000,
     })
     return response.data
   } catch (error) {
