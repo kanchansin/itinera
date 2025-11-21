@@ -1,3 +1,4 @@
+// client/app/(tabs)/profile.tsx - ENHANCED VERSION
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -118,81 +119,125 @@ export default function ProfileScreen() {
   };
 
   const menuItems = [
-    { icon: 'settings-outline', label: 'Settings', color: '#A78BFA' },
-    { icon: 'bookmark-outline', label: 'Saved', color: '#60A5FA' },
-    { icon: 'heart-outline', label: 'Favorites', color: '#F87171' },
-    { icon: 'notifications-outline', label: 'Notifications', color: '#FBBF24' },
-    { icon: 'shield-checkmark-outline', label: 'Privacy', color: '#34D399', action: togglePrivacy },
-    { icon: 'help-circle-outline', label: 'Help & Support', color: '#A78BFA' },
-    { icon: 'log-out-outline', label: 'Logout', color: '#F87171', action: handleLogout },
+    { 
+      icon: 'settings-outline', 
+      label: 'Settings', 
+      gradient: ['#667eea', '#764ba2'],
+      action: () => {} 
+    },
+    { 
+      icon: 'bookmark-outline', 
+      label: 'Saved Trips', 
+      gradient: ['#10B981', '#059669'],
+      action: () => {} 
+    },
+    { 
+      icon: 'heart-outline', 
+      label: 'Favorites', 
+      gradient: ['#EF4444', '#DC2626'],
+      action: () => {} 
+    },
+    { 
+      icon: 'notifications-outline', 
+      label: 'Notifications', 
+      gradient: ['#F59E0B', '#D97706'],
+      action: () => {} 
+    },
+    { 
+      icon: 'shield-checkmark-outline', 
+      label: 'Privacy', 
+      gradient: ['#8B5CF6', '#7C3AED'],
+      action: togglePrivacy 
+    },
+    { 
+      icon: 'help-circle-outline', 
+      label: 'Help & Support', 
+      gradient: ['#3B82F6', '#2563EB'],
+      action: () => {} 
+    },
+    { 
+      icon: 'log-out-outline', 
+      label: 'Logout', 
+      gradient: ['#EF4444', '#DC2626'],
+      action: handleLogout 
+    },
   ];
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FAFAFF" />
+      <StatusBar barStyle="light-content" backgroundColor="#667eea" />
 
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#1F2937" />
+      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.headerGradient}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Profile</Text>
+          <TouchableOpacity onPress={togglePrivacy} style={styles.lockButton}>
+            <Ionicons
+              name={isPrivate ? 'lock-closed' : 'lock-open'}
+              size={20}
+              color="#FFFFFF"
+            />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.profileHeader}>
+          <View style={styles.avatarContainer}>
+            {userData?.profilePicture || user?.profilePicture ? (
+              <Image 
+                source={{ uri: userData?.profilePicture || user?.profilePicture }} 
+                style={styles.avatar} 
+              />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={48} color="#667eea" />
+              </View>
+            )}
+            <TouchableOpacity style={styles.editAvatarButton}>
+              <Ionicons name="camera" size={16} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.profileName}>{userData?.name || user?.name || 'User'}</Text>
+          {userData?.bio && <Text style={styles.profileBio}>{userData.bio}</Text>}
+        </View>
+      </LinearGradient>
+
+      <View style={styles.statsCard}>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{guides.length}</Text>
+          <Text style={styles.statLabel}>Trips</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <TouchableOpacity style={styles.statItem}>
+          <Text style={styles.statValue}>{followers}</Text>
+          <Text style={styles.statLabel}>Followers</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity onPress={togglePrivacy} style={styles.lockButton}>
-          <Ionicons
-            name={isPrivate ? 'lock-closed' : 'lock-open'}
-            size={20}
-            color="#A78BFA"
-          />
+        <View style={styles.statDivider} />
+        <TouchableOpacity style={styles.statItem}>
+          <Text style={styles.statValue}>{following}</Text>
+          <Text style={styles.statLabel}>Following</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity style={styles.editProfileButton}>
+        <LinearGradient
+          colors={['#667eea', '#764ba2']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.editGradient}
+        >
+          <Ionicons name="create-outline" size={18} color="#FFFFFF" />
+          <Text style={styles.editProfileText}>Edit Profile</Text>
+        </LinearGradient>
+      </TouchableOpacity>
 
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <View style={styles.profileSection}>
-          <View style={styles.avatarContainer}>
-            {userData?.profilePicture || user?.profilePicture ? (
-              <Image source={{ uri: userData?.profilePicture || user?.profilePicture }} style={styles.avatar} />
-            ) : (
-              <LinearGradient
-                colors={['#E0E7FF', '#DDD6FE']}
-                style={[styles.avatar, styles.avatarPlaceholder]}
-              >
-                <Ionicons name="person" size={48} color="#8B5CF6" />
-              </LinearGradient>
-            )}
-            <View style={styles.editAvatarButton}>
-              <Ionicons name="camera" size={16} color="#FFFFFF" />
-            </View>
-          </View>
-
-          <Text style={styles.profileName}>{userData?.name || user?.name || 'User'}</Text>
-          {userData?.bio && <Text style={styles.profileBio}>{userData.bio}</Text>}
-
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{guides.length}</Text>
-              <Text style={styles.statLabel}>Trips</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <TouchableOpacity style={styles.statItem}>
-              <Text style={styles.statValue}>{followers}</Text>
-              <Text style={styles.statLabel}>Followers</Text>
-            </TouchableOpacity>
-            <View style={styles.statDivider} />
-            <TouchableOpacity style={styles.statItem}>
-              <Text style={styles.statValue}>{following}</Text>
-              <Text style={styles.statLabel}>Following</Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity style={styles.editButton}>
-            <Text style={styles.editButtonText}>Edit Profile</Text>
-            <Ionicons name="create-outline" size={16} color="#A78BFA" />
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.tabsContainer}>
           <TouchableOpacity
             style={[styles.tab, selectedTab === 'guides' && styles.tabActive]}
@@ -201,9 +246,11 @@ export default function ProfileScreen() {
             <Ionicons
               name="grid"
               size={20}
-              color={selectedTab === 'guides' ? '#A78BFA' : '#9CA3AF'}
+              color={selectedTab === 'guides' ? '#667eea' : '#9CA3AF'}
             />
-            <View style={[styles.tabIndicator, selectedTab === 'guides' && styles.tabIndicatorActive]} />
+            <Text style={[styles.tabText, selectedTab === 'guides' && styles.tabTextActive]}>
+              Trips
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, selectedTab === 'saved' && styles.tabActive]}
@@ -212,9 +259,11 @@ export default function ProfileScreen() {
             <Ionicons
               name="bookmark"
               size={20}
-              color={selectedTab === 'saved' ? '#A78BFA' : '#9CA3AF'}
+              color={selectedTab === 'saved' ? '#667eea' : '#9CA3AF'}
             />
-            <View style={[styles.tabIndicator, selectedTab === 'saved' && styles.tabIndicatorActive]} />
+            <Text style={[styles.tabText, selectedTab === 'saved' && styles.tabTextActive]}>
+              Saved
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -223,12 +272,24 @@ export default function ProfileScreen() {
             {guides.length === 0 ? (
               <View style={styles.emptyState}>
                 <View style={styles.emptyIconCircle}>
-                  <Ionicons name="images-outline" size={64} color="#C4B5FD" />
+                  <Ionicons name="map-outline" size={64} color="#667eea" />
                 </View>
-                <Text style={styles.emptyTitle}>No Trips Yet</Text>
+                <Text style={styles.emptyTitle}>No Public Trips Yet</Text>
                 <Text style={styles.emptySubtitle}>
                   Share your travel experiences with the community
                 </Text>
+                <TouchableOpacity 
+                  style={styles.createTripButton}
+                  onPress={() => router.push('/(tabs)/ai-trip-creator')}
+                >
+                  <LinearGradient
+                    colors={['#667eea', '#764ba2']}
+                    style={styles.createTripGradient}
+                  >
+                    <Ionicons name="add" size={20} color="#FFFFFF" />
+                    <Text style={styles.createTripText}>Create Trip</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
             ) : (
               guides.map((guide) => (
@@ -242,7 +303,7 @@ export default function ProfileScreen() {
                     style={styles.gridImage}
                   />
                   <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.5)']}
+                    colors={['transparent', 'rgba(0,0,0,0.6)']}
                     style={styles.gridOverlay}
                   >
                     <View style={styles.gridStats}>
@@ -261,7 +322,7 @@ export default function ProfileScreen() {
         {selectedTab === 'saved' && (
           <View style={styles.emptyState}>
             <View style={styles.emptyIconCircle}>
-              <Ionicons name="bookmark-outline" size={64} color="#C4B5FD" />
+              <Ionicons name="bookmark-outline" size={64} color="#667eea" />
             </View>
             <Text style={styles.emptyTitle}>No Saved Trips</Text>
             <Text style={styles.emptySubtitle}>Save trips to view them later</Text>
@@ -277,9 +338,12 @@ export default function ProfileScreen() {
               onPress={item.action}
             >
               <View style={styles.menuItemLeft}>
-                <View style={[styles.menuIcon, { backgroundColor: `${item.color}15` }]}>
-                  <Ionicons name={item.icon as any} size={20} color={item.color} />
-                </View>
+                <LinearGradient
+                  colors={item.gradient}
+                  style={styles.menuIconGradient}
+                >
+                  <Ionicons name={item.icon as any} size={20} color="#FFFFFF" />
+                </LinearGradient>
                 <Text style={styles.menuItemText}>{item.label}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
@@ -296,66 +360,66 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFF',
+    backgroundColor: '#FAFAFA',
   },
-  header: {
+  headerGradient: {
+    paddingTop: 56,
+    paddingBottom: 32,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 56,
     paddingHorizontal: 24,
-    paddingBottom: 20,
+    marginBottom: 24,
   },
   backButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#F3F4F6',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#FFFFFF',
   },
   lockButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FAF5FF',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  content: {
-    flex: 1,
-  },
-  profileSection: {
+  profileHeader: {
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingBottom: 24,
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    borderWidth: 3,
+    borderWidth: 4,
     borderColor: '#FFFFFF',
-    shadowColor: '#A78BFA',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
   },
   avatarPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
   },
   editAvatarButton: {
     position: 'absolute',
@@ -364,7 +428,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#A78BFA',
+    backgroundColor: '#667eea',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
@@ -373,31 +437,29 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   profileBio: {
     fontSize: 14,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 24,
     paddingHorizontal: 20,
   },
-  statsContainer: {
+  statsCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#FFFFFF',
+    marginHorizontal: 24,
+    marginTop: -20,
     borderRadius: 20,
     padding: 20,
-    marginBottom: 20,
-    width: '100%',
-    shadowColor: '#A78BFA',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
   },
   statItem: {
     flex: 1,
@@ -419,48 +481,62 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontWeight: '500',
   },
-  editButton: {
+  editProfileButton: {
+    marginHorizontal: 24,
+    marginTop: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  editGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#FAF5FF',
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: '#E9D5FF',
-    width: '100%',
+    paddingVertical: 14,
   },
-  editButtonText: {
+  editProfileText: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#A78BFA',
+    color: '#FFFFFF',
+  },
+  content: {
+    flex: 1,
+    marginTop: 24,
   },
   tabsContainer: {
     flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    paddingHorizontal: 24,
+    gap: 12,
     marginBottom: 24,
   },
   tab: {
     flex: 1,
-    paddingVertical: 16,
+    flexDirection: 'row',
     alignItems: 'center',
-    position: 'relative',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#F3F4F6',
   },
   tabActive: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#667eea',
   },
-  tabIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: 'transparent',
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9CA3AF',
   },
-  tabIndicatorActive: {
-    backgroundColor: '#A78BFA',
+  tabTextActive: {
+    color: '#667eea',
   },
   gridContainer: {
     flexDirection: 'row',
@@ -505,16 +581,14 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
+    paddingVertical: 60,
     paddingHorizontal: 40,
-    width: '100%',
   },
   emptyIconCircle: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#FAF5FF',
+    backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
@@ -530,10 +604,32 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 24,
+  },
+  createTripButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  createTripGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  createTripText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   menuSection: {
     paddingHorizontal: 24,
-    marginTop: 24,
+    marginTop: 32,
   },
   menuSectionTitle: {
     fontSize: 18,
@@ -550,7 +646,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 16,
     marginBottom: 12,
-    shadowColor: '#A78BFA',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
@@ -561,7 +657,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
   },
-  menuIcon: {
+  menuIconGradient: {
     width: 44,
     height: 44,
     borderRadius: 22,
