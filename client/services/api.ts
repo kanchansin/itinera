@@ -160,7 +160,7 @@ export const usersAPI = {
     apiCall('/users/profile', {
       method: 'GET',
       headers: { Authorization: `Bearer ${token}` },
-    }),
+    }).catch(() => ({ trips: [], name: 'User', email: '' })),
 
   updateProfile: (data: any, token: string) =>
     apiCall('/users/profile', {
@@ -231,5 +231,54 @@ export const aiAPI = {
     apiCall('/ai/analyze-sentiment', {
       method: 'POST',
       body: { text },
+    }),
+
+  generateFullTripPlan: (preferences: any) =>
+    apiCall('/ai/generate-full-trip', {
+      method: 'POST',
+      body: preferences,
+    }),
+
+  improveSearchQuery: (query: string) =>
+    apiCall('/ai/improve-search', {
+      method: 'POST',
+      body: { query },
+    }),
+
+  rankPlacesByPreferences: (places: any[], preferences: any) =>
+    apiCall('/ai/rank-places', {
+      method: 'POST',
+      body: { places, preferences },
+    }),
+
+  optimizeTripSequence: (stops: any[], startTime: string, curfewTime: string, travelTimes?: number[]) =>
+    apiCall('/ai/optimize-sequence', {
+      method: 'POST',
+      body: { stops, startTime, curfewTime, travelTimes },
+    }),
+
+  generateGuidePost: (userTrips: any[], userPreferences: any, token: string) =>
+    apiCall('/ai/generate-guide', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: { userTrips, userPreferences },
+    }),
+
+  getDiscoverRecommendations: (latitude: number, longitude: number, userPreferences: any) =>
+    apiCall('/ai/discover-recommendations', {
+      method: 'POST',
+      body: { latitude, longitude, userPreferences },
+    }),
+
+  getLiveNavigationGuidance: (
+    currentLatitude: number,
+    currentLongitude: number,
+    remainingStops: any[],
+    traffic: any,
+    weather: any
+  ) =>
+    apiCall('/ai/live-guidance', {
+      method: 'POST',
+      body: { currentLatitude, currentLongitude, remainingStops, traffic, weather },
     }),
 };

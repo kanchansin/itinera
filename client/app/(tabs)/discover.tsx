@@ -1,4 +1,3 @@
-// client/app/(tabs)/discover.tsx - AI ENHANCED VERSION
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -39,7 +38,6 @@ export default function AIDiscoverTab() {
         const loc = await Location.getCurrentPositionAsync({});
         setLocation(loc);
 
-        // Get AI recommendations
         const response = await axios.post(`${API_URL}/ai/discover-recommendations`, {
           latitude: loc.coords.latitude,
           longitude: loc.coords.longitude,

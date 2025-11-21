@@ -1,4 +1,3 @@
-// client/app/(tabs)/profile.tsx - ENHANCED VERSION
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -122,43 +121,43 @@ export default function ProfileScreen() {
     { 
       icon: 'settings-outline', 
       label: 'Settings', 
-      gradient: ['#667eea', '#764ba2'],
+      gradient: ['#667eea', '#764ba2'] as const,
       action: () => {} 
     },
     { 
       icon: 'bookmark-outline', 
       label: 'Saved Trips', 
-      gradient: ['#10B981', '#059669'],
+      gradient: ['#10B981', '#059669'] as const,
       action: () => {} 
     },
     { 
       icon: 'heart-outline', 
       label: 'Favorites', 
-      gradient: ['#EF4444', '#DC2626'],
+      gradient: ['#EF4444', '#DC2626'] as const,
       action: () => {} 
     },
     { 
       icon: 'notifications-outline', 
       label: 'Notifications', 
-      gradient: ['#F59E0B', '#D97706'],
+      gradient: ['#F59E0B', '#D97706'] as const,
       action: () => {} 
     },
     { 
       icon: 'shield-checkmark-outline', 
       label: 'Privacy', 
-      gradient: ['#8B5CF6', '#7C3AED'],
+      gradient: ['#8B5CF6', '#7C3AED'] as const,
       action: togglePrivacy 
     },
     { 
       icon: 'help-circle-outline', 
       label: 'Help & Support', 
-      gradient: ['#3B82F6', '#2563EB'],
+      gradient: ['#3B82F6', '#2563EB'] as const,
       action: () => {} 
     },
     { 
       icon: 'log-out-outline', 
       label: 'Logout', 
-      gradient: ['#EF4444', '#DC2626'],
+      gradient: ['#EF4444', '#DC2626'] as const,
       action: handleLogout 
     },
   ];

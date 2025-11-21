@@ -1,4 +1,3 @@
-// client/app/(tabs)/explore.tsx - AI ENHANCED VERSION
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -41,7 +40,6 @@ export default function AIExplore() {
     }
 
     try {
-      // Fetch user's trips
       const tripsQuery = query(
         collection(db, 'trips'),
         where('userId', '==', user.id),
@@ -51,7 +49,6 @@ export default function AIExplore() {
       const trips = tripsSnapshot.docs.map(doc => doc.data());
       setUserTrips(trips);
 
-      // Generate AI guide post based on user's travel history
       if (trips.length > 0) {
         const response = await axios.post(
           `${API_URL}/ai/generate-guide`,
@@ -70,7 +67,6 @@ export default function AIExplore() {
         setGuidePost(response.data);
       }
 
-      // Fetch AI recommendations from public trips
       const publicTripsQuery = query(
         collection(db, 'trips'),
         where('isPublic', '==', true),
@@ -79,15 +75,13 @@ export default function AIExplore() {
       const publicSnapshot = await getDocs(publicTripsQuery);
       const publicTrips = publicSnapshot.docs.map(doc => doc.data());
 
-      // Filter based on user preferences (simple matching)
       const recommended = publicTrips.filter(trip => {
         if (trips.length === 0) return true;
         
-        // Match destinations
         const userDestinations = trips.map(t => t.destination?.toLowerCase());
         const hasVisited = userDestinations.includes(trip.destination?.toLowerCase());
         
-        return !hasVisited; // Recommend places they haven't been
+        return !hasVisited; 
       });
 
       setAiRecommendations(recommended.slice(0, 10));

@@ -106,6 +106,18 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="ai-trip-creator"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="trip-preview"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
