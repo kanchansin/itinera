@@ -10,6 +10,7 @@ import userRoutes from "./src/routes/users.js"
 import destinationRoutes from "./src/routes/destinations.js"
 import tripInteractionRoutes from "./src/routes/trip-interactions.js"
 import aiRoutes from "./src/routes/ai.js"
+import guideRoutes from "./src/routes/guides.js"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -37,13 +38,14 @@ app.use((req, res, next) => {
 async function startServer() {
   try {
     await connectDB()
-    
+
     app.use("/api/auth", authRoutes)
     app.use("/api/trips", tripRoutes)
     app.use("/api/users", userRoutes)
     app.use("/api/destinations", destinationRoutes)
     app.use("/api/interactions", tripInteractionRoutes)
     app.use("/api/ai", aiRoutes)
+    app.use("/api/guides", guideRoutes)
 
     app.get("/api/health", (req, res) => {
       console.log('[HEALTH] Health check requested')
@@ -53,7 +55,7 @@ async function startServer() {
     app.use((err, req, res, next) => {
       console.error('[ERROR] Unhandled error:', err.message)
       console.error('[ERROR] Stack:', err.stack)
-      res.status(500).json({ 
+      res.status(500).json({
         error: err.message || 'Internal server error',
         details: process.env.NODE_ENV === 'development' ? err.stack : undefined
       })

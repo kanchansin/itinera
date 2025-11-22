@@ -18,6 +18,7 @@ export const createTrip = async (req, res) => {
       endTime,
       transport,
       isPublic: isPublic || false,
+      status: "active",
       likesCount: 0,
       createdAt: new Date().toISOString(),
     }
@@ -74,6 +75,70 @@ export const getTrips = async (req, res) => {
   }
 }
 
+export const getActiveTrip = async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const db = getDB()
+    const activeTripsSnapshot = await db
+      .collection("trips")
+      .where("userId", "==", userId)
+      .where("status", "==", "active")
+      .orderBy("createdAt", "desc")
+      .limit(1)
+      .get()
+
+    if (activeTripsSnapshot.empty) {
+      return res.json(null)
+    }
+
+    const tripData = activeTripsSnapshot.docs[0].data()
+    const stopsSnapshot = await db
+      .collection("tripStops")
+      .where("tripId", "==", tripData.id)
+      .orderBy("orderIndex", "asc")
+      .get()
+    const stops = stopsSnapshot.docs.map((doc) => doc.data())
+
+    res.json({ ...tripData, stops })
+  } catch (error) {
+    console.error("Get Active Trip Error:", error.message)
+    res.status(500).json({ error: error.message })
+  }
+}
+
+export const endTrip = async (req, res) => {
+  try {
+    const { id } = req.params
+    const userId = req.user.userId
+    const db = getDB()
+
+    const tripRef = db.collection("trips").doc(id)
+    const tripSnapshot = await tripRef.get()
+
+    if (!tripSnapshot.exists) {
+      return res.status(404).json({ error: "Trip not found" })
+    }
+
+    const trip = tripSnapshot.data()
+
+    if (trip.userId !== userId) {
+      return res.status(403).json({ error: "Access denied" })
+    }
+
+    await tripRef.update({
+      status: "completed",
+      endedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+
+    const updatedTrip = await tripRef.get()
+    res.json(updatedTrip.data())
+  } catch (error) {
+    console.error("End Trip Error:", error.message)
+    res.status(500).json({ error: error.message })
+  }
+}
+
 export const getTripById = async (req, res) => {
   try {
     const { id } = req.params
@@ -105,7 +170,7 @@ export const updateTrip = async (req, res) => {
   try {
     const { id } = req.params
     const userId = req.user.userId
-    const { title, destination, startLocation, startTime, endTime, transport, isPublic } = req.body
+    const { title, destination, startLocation, startTime, endTime, transport, isPublic, status } = req.body
     const db = getDB()
     const tripRef = db.collection("trips").doc(id)
     const tripSnapshot = await tripRef.get()
@@ -124,6 +189,7 @@ export const updateTrip = async (req, res) => {
     if (endTime !== undefined) updateData.endTime = endTime
     if (transport !== undefined) updateData.transport = transport
     if (isPublic !== undefined) updateData.isPublic = isPublic
+    if (status !== undefined) updateData.status = status
     updateData.updatedAt = new Date().toISOString()
     await tripRef.update(updateData)
     const updatedTrip = await tripRef.get()
@@ -245,15 +311,15 @@ function decodePolyline(encoded) {
 export const calculateTripRoute = async (req, res) => {
   try {
     const { stops, transport = "driving" } = req.body
-    
+
     if (!stops || stops.length < 2) {
       return res.status(400).json({ error: "At least 2 stops required" })
     }
-    
+
     const allRoutePoints = []
     let totalDuration = 0
     let totalDistance = 0
-    
+
     for (let i = 0; i < stops.length - 1; i++) {
       try {
         const directions = await getDirections(
@@ -261,14 +327,14 @@ export const calculateTripRoute = async (req, res) => {
           `${stops[i + 1].latitude},${stops[i + 1].longitude}`,
           transport,
         )
-        
+
         if (directions.routes && directions.routes.length > 0) {
           const route = directions.routes[0]
           const leg = route.legs[0]
-          
+
           totalDuration += leg.duration.value
           totalDistance += leg.distance.value
-          
+
           if (route.overview_polyline && route.overview_polyline.points) {
             const decodedPoints = decodePolyline(route.overview_polyline.points)
             if (i > 0) {
@@ -295,11 +361,11 @@ export const calculateTripRoute = async (req, res) => {
         allRoutePoints.push(stops[i + 1])
       }
     }
-    
+
     if (allRoutePoints.length === 0) {
       return res.json({ route: stops })
     }
-    
+
     res.json({
       route: allRoutePoints,
       totalDuration: Math.ceil(totalDuration / 60),
@@ -307,7 +373,7 @@ export const calculateTripRoute = async (req, res) => {
     })
   } catch (error) {
     console.error("Calculate Trip Route Error:", error.message)
-    res.status(500).json({ 
+    res.status(500).json({
       error: error.message,
       route: req.body.stops || []
     })

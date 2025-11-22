@@ -65,14 +65,17 @@ export default function TripPreviewScreen() {
       const savedTrip = {
         id: tripId,
         tripName: tripData.title,
+        title: tripData.title,
         date: new Date().toISOString(),
         startLocation: 'Current Location',
         startTime: tripData.stops[0]?.arrival || '9:00 AM',
+        endTime: tripData.stops[tripData.stops.length - 1]?.departure || '6:00 PM',
         transport: preferences?.travelerType || 'driving',
         stops: stopsList,
         userId: user.id,
         destination: tripData.stops[tripData.stops.length - 1]?.name || 'Multiple',
         isPublic: false,
+        status: 'active',
         likesCount: 0,
         estimatedCost: tripData.estimatedCost,
         mealBreaks: tripData.mealBreaks,
@@ -84,10 +87,10 @@ export default function TripPreviewScreen() {
       const tripRef = doc(db, 'trips', tripId);
       await setDoc(tripRef, savedTrip);
 
-      Alert.alert('Success', 'Trip saved successfully!', [
+      Alert.alert('Success', 'Trip started! Check your home screen.', [
         {
-          text: 'View Trips',
-          onPress: () => router.replace('/(tabs)'),
+          text: 'OK',
+          onPress: () => router.replace('/'),
         },
       ]);
     } catch (error) {
@@ -216,7 +219,7 @@ export default function TripPreviewScreen() {
             ) : (
               <>
                 <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" />
-                <Text style={styles.saveText}>Save Trip</Text>
+                <Text style={styles.saveText}>Start Trip</Text>
               </>
             )}
           </LinearGradient>

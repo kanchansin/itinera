@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 interface GeminiResponse {
   candidates: Array<{
@@ -69,7 +69,7 @@ const callGemini = async (prompt: string): Promise<string> => {
           maxOutputTokens: 2048,
         },
       },
-      { timeout: 30000 }
+      { timeout: 120000 }
     );
 
     return response.data.candidates[0].content.parts[0].text.trim();
@@ -138,12 +138,12 @@ Ensure:
 - Return before curfew`;
 
   const response = await callGemini(prompt);
-  
+
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     throw new Error('Invalid AI response format');
   }
-  
+
   return JSON.parse(jsonMatch[0]);
 };
 
@@ -180,9 +180,9 @@ Return a JSON array of place indices in ranked order (best to worst):
 
   const response = await callGemini(prompt);
   const jsonMatch = response.match(/\[[\s\S]*\]/);
-  
+
   if (!jsonMatch) return places;
-  
+
   const rankedIndices = JSON.parse(jsonMatch[0]);
   return rankedIndices.map((idx: number) => places[idx]).filter(Boolean);
 };
@@ -224,11 +224,11 @@ Generate optimized sequence in JSON:
 
   const response = await callGemini(prompt);
   const jsonMatch = response.match(/\{[\s\S]*\}/);
-  
+
   if (!jsonMatch) {
     throw new Error('Invalid optimization response');
   }
-  
+
   return JSON.parse(jsonMatch[0]);
 };
 
@@ -267,11 +267,11 @@ Create 4-6 spots that match their style.`;
 
   const response = await callGemini(prompt);
   const jsonMatch = response.match(/\{[\s\S]*\}/);
-  
+
   if (!jsonMatch) {
     throw new Error('Invalid guide post response');
   }
-  
+
   return JSON.parse(jsonMatch[0]);
 };
 
@@ -309,11 +309,11 @@ Generate recommendations in JSON:
 
   const response = await callGemini(prompt);
   const jsonMatch = response.match(/\{[\s\S]*\}/);
-  
+
   if (!jsonMatch) {
     throw new Error('Invalid recommendations response');
   }
-  
+
   return JSON.parse(jsonMatch[0]);
 };
 
@@ -345,11 +345,11 @@ Analyze and provide guidance in JSON:
 
   const response = await callGemini(prompt);
   const jsonMatch = response.match(/\{[\s\S]*\}/);
-  
+
   if (!jsonMatch) {
     throw new Error('Invalid guidance response');
   }
-  
+
   return JSON.parse(jsonMatch[0]);
 };
 
@@ -377,10 +377,10 @@ Return JSON:
 
   const response = await callGemini(prompt);
   const jsonMatch = response.match(/\{[\s\S]*\}/);
-  
+
   if (!jsonMatch) {
     throw new Error('Invalid feasibility response');
   }
-  
+
   return JSON.parse(jsonMatch[0]);
 };

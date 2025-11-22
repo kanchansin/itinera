@@ -24,8 +24,8 @@ const apiCall = async (endpoint: string, options: RequestOptions = {}) => {
   try {
     console.log('[API] Making request:', method, `${API_URL}${endpoint}`);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-    
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
+
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...requestOptions,
       signal: controller.signal
@@ -33,7 +33,7 @@ const apiCall = async (endpoint: string, options: RequestOptions = {}) => {
 
     clearTimeout(timeoutId);
     console.log('[API] Response status:', response.status);
-    
+
     if (!response.ok) {
       console.log('[API] Response not ok, attempting to parse error');
       let errorData;

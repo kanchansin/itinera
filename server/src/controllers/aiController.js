@@ -2,7 +2,7 @@
 import axios from "axios"
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY
 
 const callGemini = async (prompt) => {
@@ -18,8 +18,13 @@ const callGemini = async (prompt) => {
           maxOutputTokens: 2048,
         },
       },
-      { timeout: 30000 }
+      { timeout: 120000 }
     )
+    // Validate response
+    if (!response.data || !response.data.candidates || response.data.candidates.length === 0) {
+      console.error("Invalid Gemini response:", JSON.stringify(response.data, null, 2));
+      throw new Error("Invalid API response structure");
+    }
     return response.data.candidates[0].content.parts[0].text.trim()
   } catch (error) {
     console.error("Gemini API Error:", error.message)
@@ -105,7 +110,7 @@ Ensure:
 
     const response = await callGemini(prompt)
     const jsonMatch = response.match(/\{[\s\S]*\}/)
-    
+
     if (!jsonMatch) {
       return res.status(500).json({ error: "Invalid AI response format" })
     }
@@ -172,7 +177,7 @@ No other text, just the array.`
 
     const response = await callGemini(prompt)
     const jsonMatch = response.match(/\[[\s\S]*?\]/)
-    
+
     if (!jsonMatch) {
       return res.json({ rankedIndices: places.map((_, i) => i) })
     }
@@ -226,7 +231,7 @@ Consider:
 
     const response = await callGemini(prompt)
     const jsonMatch = response.match(/\{[\s\S]*\}/)
-    
+
     if (!jsonMatch) {
       return res.status(500).json({ error: "Invalid optimization response" })
     }
@@ -274,7 +279,7 @@ Create 4-6 spots that match their travel style.`
 
     const response = await callGemini(prompt)
     const jsonMatch = response.match(/\{[\s\S]*\}/)
-    
+
     if (!jsonMatch) {
       return res.status(500).json({ error: "Invalid guide post response" })
     }
@@ -297,8 +302,8 @@ export const getDiscoverRecommendations = async (req, res) => {
 
     const currentMonth = new Date().toLocaleString('default', { month: 'long' })
     const season = ['December', 'January', 'February'].includes(currentMonth) ? 'Winter' :
-                   ['March', 'April', 'May'].includes(currentMonth) ? 'Spring' :
-                   ['June', 'July', 'August'].includes(currentMonth) ? 'Summer' : 'Autumn'
+      ['March', 'April', 'May'].includes(currentMonth) ? 'Spring' :
+        ['June', 'July', 'August'].includes(currentMonth) ? 'Summer' : 'Autumn'
 
     const prompt = `Generate location and experience recommendations:
 
@@ -344,7 +349,7 @@ Generate recommendations in JSON:
 
     const response = await callGemini(prompt)
     const jsonMatch = response.match(/\{[\s\S]*\}/)
-    
+
     if (!jsonMatch) {
       return res.status(500).json({ error: "Invalid recommendations response" })
     }
@@ -384,7 +389,7 @@ Only suggest reordering if there are significant issues.`
 
     const response = await callGemini(prompt)
     const jsonMatch = response.match(/\{[\s\S]*\}/)
-    
+
     if (!jsonMatch) {
       return res.status(500).json({ error: "Invalid guidance response" })
     }
@@ -453,7 +458,7 @@ export const analyzeSentiment = async (req, res) => {
     }
 
     const prompt = `Analyze the sentiment of this review and respond with only "positive", "negative", or "neutral": "${text}"`
-    
+
     const sentiment = await callGemini(prompt)
     res.json({ sentiment: sentiment.toLowerCase().trim() })
   } catch (error) {

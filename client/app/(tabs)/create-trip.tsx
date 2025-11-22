@@ -10,7 +10,9 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Polyline, Marker } from 'react-native-maps';
@@ -60,7 +62,8 @@ export default function CreateTripScreen() {
 
   const [currentStep, setCurrentStep] = useState(1);
   const [startLocation, setStartLocation] = useState(existingTrip?.startLocation || '');
-  const [startTime, setStartTime] = useState(existingTrip?.startTime || '');
+  const [startTime, setStartTime] = useState<Date>(new Date());
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedMode, setSelectedMode] = useState(existingTrip?.transport || 'driving');
   const [destinations, setDestinations] = useState<Stop[]>(existingTrip?.stops || []);
   const [newDestination, setNewDestination] = useState('');
@@ -199,7 +202,7 @@ export default function CreateTripScreen() {
     setRecalculating(true);
     try {
       const allPoints = [startCoords, ...destinations.map((d) => d.location)];
-      
+
       const response = await axios.post(`${API_URL}/trips/calculate-route`, {
         stops: allPoints,
         transport: selectedMode,
@@ -222,8 +225,24 @@ export default function CreateTripScreen() {
     calculateRoute();
   };
 
+  const formatTime = (date: Date) => {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    const displayMinutes = minutes < 10 ? `0${minutes}` : minutes;
+    return `${displayHours}:${displayMinutes} ${ampm}`;
+  };
+
+  const handleTimeChange = (event: any, selectedDate?: Date) => {
+    setShowTimePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setStartTime(selectedDate);
+    }
+  };
+
   const handleSaveTrip = async () => {
-    if (!startLocation || !startTime || destinations.length === 0 || !tripTitle) {
+    if (!startLocation || !tripTitle || destinations.length === 0) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
@@ -240,16 +259,16 @@ export default function CreateTripScreen() {
 
     setSaving(true);
     try {
-      const tripId = editMode && existingTrip?.id 
-        ? existingTrip.id 
+      const tripId = editMode && existingTrip?.id
+        ? existingTrip.id
         : `trip_${user.id}_${Date.now()}`;
 
       const tripData = {
         id: tripId,
         tripName: tripTitle,
-        date: startTime,
+        date: formatTime(startTime),
         startLocation: startLocation,
-        startTime: startTime,
+        startTime: formatTime(startTime),
         transport: selectedMode,
         stops: [
           {
@@ -280,7 +299,7 @@ export default function CreateTripScreen() {
         if (!tripSnapshot.exists()) {
           throw new Error('Trip not found');
         }
-        
+
         const existingData = tripSnapshot.data();
         if (existingData.userId !== user.id) {
           throw new Error('Not authorized to update this trip');
@@ -312,46 +331,32 @@ export default function CreateTripScreen() {
   };
 
   return (
-    <LinearGradient colors={['#FFFFFF', '#E8F1F8']} style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#667eea" />
 
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#0E2954" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{editMode ? 'Edit Trip' : 'Create My Trip'}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.header}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{editMode ? 'Edit Trip' : 'Create Trip'}</Text>
+          <View style={{ width: 40 }} />
+        </View>
 
-      <View style={styles.stepperContainer}>
-        {[1, 2, 3, 4].map((step) => (
-          <View key={step} style={styles.stepItem}>
+        <View style={styles.progressContainer}>
+          <View style={styles.progressBar}>
             <View
               style={[
-                styles.stepCircle,
-                currentStep >= step && styles.stepCircleActive,
+                styles.progressFill,
+                { width: `${(currentStep / totalSteps) * 100}%` },
               ]}
-            >
-              <Text
-                style={[
-                  styles.stepNumber,
-                  currentStep >= step && styles.stepNumberActive,
-                ]}
-              >
-                {step}
-              </Text>
-            </View>
-            {step < totalSteps && (
-              <View
-                style={[
-                  styles.stepLine,
-                  currentStep > step && styles.stepLineActive,
-                ]}
-              />
-            )}
+            />
           </View>
-        ))}
-      </View>
+          <Text style={styles.progressText}>
+            Step {currentStep} of {totalSteps}
+          </Text>
+        </View>
+      </LinearGradient>
 
       <ScrollView
         style={styles.content}
@@ -361,22 +366,22 @@ export default function CreateTripScreen() {
       >
         {currentStep === 1 && (
           <View style={styles.stepCard}>
-            <View style={styles.stepHeader}>
-              <Ionicons name="location" size={28} color="#5DA7DB" />
-              <Text style={styles.stepTitle}>Start Your Journey</Text>
+            <View style={styles.stepIconContainer}>
+              <Ionicons name="location" size={32} color="#667eea" />
             </View>
+            <Text style={styles.stepTitle}>Start Your Journey</Text>
             <Text style={styles.stepDescription}>
-              Tell us where and when you'd like to start
+              Tell us where and when you'd like to begin
             </Text>
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Trip Title</Text>
               <View style={styles.inputWrapper}>
-                <Ionicons name="pencil" size={20} color="#5DA7DB" />
+                <Ionicons name="pencil" size={20} color="#667eea" />
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter trip title"
-                  placeholderTextColor="#A0B4C8"
+                  placeholder="e.g., Weekend Getaway"
+                  placeholderTextColor="#9CA3AF"
                   value={tripTitle}
                   onChangeText={setTripTitle}
                 />
@@ -386,11 +391,11 @@ export default function CreateTripScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Starting Location</Text>
               <View style={styles.inputWrapper}>
-                <Ionicons name="pin" size={20} color="#5DA7DB" />
+                <Ionicons name="pin" size={20} color="#667eea" />
                 <TextInput
                   style={styles.input}
                   placeholder="Search for starting point"
-                  placeholderTextColor="#A0B4C8"
+                  placeholderTextColor="#9CA3AF"
                   value={startLocation}
                   onChangeText={(text) => {
                     setStartLocation(text);
@@ -403,108 +408,122 @@ export default function CreateTripScreen() {
                   }}
                 />
                 {loadingSuggestions && (
-                  <ActivityIndicator size="small" color="#5DA7DB" />
+                  <ActivityIndicator size="small" color="#667eea" />
                 )}
               </View>
               {showStartSuggestions && startSuggestions.length > 0 && (
                 <View style={styles.suggestionsContainer}>
-                  {startSuggestions.map((suggestion) => (
-                    <TouchableOpacity
-                      key={suggestion.place_id}
-                      style={styles.suggestionItem}
-                      onPress={() => selectStartLocation(suggestion)}
-                    >
-                      <Ionicons name="location" size={16} color="#5DA7DB" />
-                      <View style={styles.suggestionText}>
-                        <Text style={styles.suggestionName}>
-                          {suggestion.structured_formatting.main_text}
-                        </Text>
-                        <Text style={styles.suggestionAddress}>
-                          {suggestion.structured_formatting.secondary_text}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                  <ScrollView style={styles.suggestionsList} nestedScrollEnabled>
+                    {startSuggestions.map((suggestion) => (
+                      <TouchableOpacity
+                        key={suggestion.place_id}
+                        style={styles.suggestionItem}
+                        onPress={() => selectStartLocation(suggestion)}
+                      >
+                        <View style={styles.suggestionIcon}>
+                          <Ionicons name="location" size={18} color="#667eea" />
+                        </View>
+                        <View style={styles.suggestionText}>
+                          <Text style={styles.suggestionName}>
+                            {suggestion.structured_formatting.main_text}
+                          </Text>
+                          <Text style={styles.suggestionAddress}>
+                            {suggestion.structured_formatting.secondary_text}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
                 </View>
               )}
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Start Time</Text>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="time" size={20} color="#5DA7DB" />
-                <TextInput
-                  style={styles.input}
-                  placeholder="09:00 AM"
-                  placeholderTextColor="#A0B4C8"
+              <TouchableOpacity
+                style={styles.inputWrapper}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Ionicons name="time" size={20} color="#667eea" />
+                <Text style={styles.timeText}>{formatTime(startTime)}</Text>
+                <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+              {showTimePicker && (
+                <DateTimePicker
                   value={startTime}
-                  onChangeText={setStartTime}
+                  mode="time"
+                  is24Hour={false}
+                  display="default"
+                  onChange={handleTimeChange}
                 />
-              </View>
+              )}
             </View>
           </View>
         )}
 
         {currentStep === 2 && (
           <View style={styles.stepCard}>
-            <View style={styles.stepHeader}>
-              <Ionicons name="flag" size={28} color="#5DA7DB" />
-              <Text style={styles.stepTitle}>Add Destinations</Text>
+            <View style={styles.stepIconContainer}>
+              <Ionicons name="flag" size={32} color="#667eea" />
             </View>
+            <Text style={styles.stepTitle}>Add Destinations</Text>
             <Text style={styles.stepDescription}>
               Where would you like to visit?
             </Text>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Add a Place</Text>
-              <View style={styles.addDestinationRow}>
-                <View style={[styles.inputWrapper, { flex: 1 }]}>
-                  <Ionicons name="search" size={20} color="#5DA7DB" />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Search destinations..."
-                    placeholderTextColor="#A0B4C8"
-                    value={newDestination}
-                    onChangeText={(text) => {
-                      setNewDestination(text);
-                      searchPlacesAutocomplete(text, false);
-                    }}
-                    onFocus={() => {
-                      if (destSuggestions.length > 0) {
-                        setShowDestSuggestions(true);
-                      }
-                    }}
-                  />
-                  {loadingSuggestions && (
-                    <ActivityIndicator size="small" color="#5DA7DB" />
-                  )}
-                </View>
+              <Text style={styles.inputLabel}>Search Places</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="search" size={20} color="#667eea" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Search destinations..."
+                  placeholderTextColor="#9CA3AF"
+                  value={newDestination}
+                  onChangeText={(text) => {
+                    setNewDestination(text);
+                    searchPlacesAutocomplete(text, false);
+                  }}
+                  onFocus={() => {
+                    if (destSuggestions.length > 0) {
+                      setShowDestSuggestions(true);
+                    }
+                  }}
+                />
+                {loadingSuggestions && (
+                  <ActivityIndicator size="small" color="#667eea" />
+                )}
               </View>
               {showDestSuggestions && destSuggestions.length > 0 && (
                 <View style={styles.suggestionsContainer}>
-                  {destSuggestions.map((suggestion) => (
-                    <TouchableOpacity
-                      key={suggestion.place_id}
-                      style={styles.suggestionItem}
-                      onPress={() => selectDestination(suggestion)}
-                    >
-                      <Ionicons name="location" size={16} color="#5DA7DB" />
-                      <View style={styles.suggestionText}>
-                        <Text style={styles.suggestionName}>
-                          {suggestion.structured_formatting.main_text}
-                        </Text>
-                        <Text style={styles.suggestionAddress}>
-                          {suggestion.structured_formatting.secondary_text}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                  <ScrollView style={styles.suggestionsList} nestedScrollEnabled>
+                    {destSuggestions.map((suggestion) => (
+                      <TouchableOpacity
+                        key={suggestion.place_id}
+                        style={styles.suggestionItem}
+                        onPress={() => selectDestination(suggestion)}
+                      >
+                        <View style={styles.suggestionIcon}>
+                          <Ionicons name="location" size={18} color="#667eea" />
+                        </View>
+                        <View style={styles.suggestionText}>
+                          <Text style={styles.suggestionName}>
+                            {suggestion.structured_formatting.main_text}
+                          </Text>
+                          <Text style={styles.suggestionAddress}>
+                            {suggestion.structured_formatting.secondary_text}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
                 </View>
               )}
             </View>
 
             {destinations.length > 0 && (
               <View style={styles.destinationsList}>
+                <Text style={styles.destinationsHeader}>Your Destinations</Text>
                 {destinations.map((dest, index) => (
                   <View key={dest.id} style={styles.destinationItem}>
                     <View style={styles.destinationNumber}>
@@ -517,8 +536,9 @@ export default function CreateTripScreen() {
                     </View>
                     <TouchableOpacity
                       onPress={() => removeDestination(dest.id)}
+                      style={styles.removeButton}
                     >
-                      <Ionicons name="close-circle" size={24} color="#FF6B6B" />
+                      <Ionicons name="close-circle" size={24} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -527,12 +547,14 @@ export default function CreateTripScreen() {
 
             {destinations.length === 0 && (
               <View style={styles.emptyState}>
-                <Ionicons name="map" size={48} color="#A0B4C8" />
+                <View style={styles.emptyIconCircle}>
+                  <Ionicons name="map" size={48} color="#667eea" />
+                </View>
                 <Text style={styles.emptyText}>
                   No destinations added yet
                 </Text>
                 <Text style={styles.emptySubtext}>
-                  Start by adding places you'd like to visit
+                  Start by searching for places you'd like to visit
                 </Text>
               </View>
             )}
@@ -541,12 +563,12 @@ export default function CreateTripScreen() {
 
         {currentStep === 3 && (
           <View style={styles.stepCard}>
-            <View style={styles.stepHeader}>
-              <Ionicons name="car-sport" size={28} color="#5DA7DB" />
-              <Text style={styles.stepTitle}>How Will You Travel?</Text>
+            <View style={styles.stepIconContainer}>
+              <Ionicons name="car-sport" size={32} color="#667eea" />
             </View>
+            <Text style={styles.stepTitle}>Travel Mode</Text>
             <Text style={styles.stepDescription}>
-              Select your preferred mode of transport
+              How will you get around?
             </Text>
 
             <View style={styles.travelModesGrid}>
@@ -559,11 +581,16 @@ export default function CreateTripScreen() {
                   ]}
                   onPress={() => setSelectedMode(mode.id)}
                 >
-                  <Ionicons
-                    name={mode.icon as any}
-                    size={32}
-                    color={selectedMode === mode.id ? '#5DA7DB' : '#A0B4C8'}
-                  />
+                  <View style={[
+                    styles.travelModeIcon,
+                    selectedMode === mode.id && styles.travelModeIconActive
+                  ]}>
+                    <Ionicons
+                      name={mode.icon as any}
+                      size={28}
+                      color={selectedMode === mode.id ? '#FFFFFF' : '#667eea'}
+                    />
+                  </View>
                   <Text
                     style={[
                       styles.travelModeLabel,
@@ -574,7 +601,7 @@ export default function CreateTripScreen() {
                   </Text>
                   {selectedMode === mode.id && (
                     <View style={styles.selectedBadge}>
-                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                      <Ionicons name="checkmark" size={14} color="#FFFFFF" />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -585,18 +612,20 @@ export default function CreateTripScreen() {
 
         {currentStep === 4 && (
           <View style={styles.stepCard}>
-            <View style={styles.stepHeader}>
-              <Ionicons name="eye" size={28} color="#5DA7DB" />
-              <Text style={styles.stepTitle}>Trip Preview</Text>
+            <View style={styles.stepIconContainer}>
+              <Ionicons name="checkmark-circle" size={32} color="#667eea" />
             </View>
+            <Text style={styles.stepTitle}>Review & Save</Text>
             <Text style={styles.stepDescription}>
-              Review your trip before saving
+              Everything looks good?
             </Text>
 
             <View style={styles.previewCard}>
               <View style={styles.previewRow}>
-                <Ionicons name="document-text" size={20} color="#5DA7DB" />
-                <View style={{ flex: 1, marginLeft: 12 }}>
+                <View style={styles.previewIcon}>
+                  <Ionicons name="document-text" size={20} color="#667eea" />
+                </View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.previewLabel}>Trip Title</Text>
                   <Text style={styles.previewValue}>
                     {tripTitle || 'Not set'}
@@ -607,8 +636,10 @@ export default function CreateTripScreen() {
               <View style={styles.previewDivider} />
 
               <View style={styles.previewRow}>
-                <Ionicons name="location" size={20} color="#5DA7DB" />
-                <View style={{ flex: 1, marginLeft: 12 }}>
+                <View style={styles.previewIcon}>
+                  <Ionicons name="location" size={20} color="#667eea" />
+                </View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.previewLabel}>Starting Point</Text>
                   <Text style={styles.previewValue}>
                     {startLocation || 'Not set'}
@@ -619,11 +650,13 @@ export default function CreateTripScreen() {
               <View style={styles.previewDivider} />
 
               <View style={styles.previewRow}>
-                <Ionicons name="time" size={20} color="#5DA7DB" />
-                <View style={{ flex: 1, marginLeft: 12 }}>
+                <View style={styles.previewIcon}>
+                  <Ionicons name="time" size={20} color="#667eea" />
+                </View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.previewLabel}>Start Time</Text>
                   <Text style={styles.previewValue}>
-                    {startTime || 'Not set'}
+                    {formatTime(startTime)}
                   </Text>
                 </View>
               </View>
@@ -631,11 +664,13 @@ export default function CreateTripScreen() {
               <View style={styles.previewDivider} />
 
               <View style={styles.previewRow}>
-                <Ionicons name="flag" size={20} color="#5DA7DB" />
-                <View style={{ flex: 1, marginLeft: 12 }}>
+                <View style={styles.previewIcon}>
+                  <Ionicons name="flag" size={20} color="#667eea" />
+                </View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.previewLabel}>Destinations</Text>
                   <Text style={styles.previewValue}>
-                    {destinations.length} places
+                    {destinations.length} {destinations.length === 1 ? 'place' : 'places'}
                   </Text>
                 </View>
               </View>
@@ -643,8 +678,10 @@ export default function CreateTripScreen() {
               <View style={styles.previewDivider} />
 
               <View style={styles.previewRow}>
-                <Ionicons name="car-sport" size={20} color="#5DA7DB" />
-                <View style={{ flex: 1, marginLeft: 12 }}>
+                <View style={styles.previewIcon}>
+                  <Ionicons name="car-sport" size={20} color="#667eea" />
+                </View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.previewLabel}>Travel Mode</Text>
                   <Text style={styles.previewValue}>
                     {travelModes.find((m) => m.id === selectedMode)?.label}
@@ -667,59 +704,61 @@ export default function CreateTripScreen() {
                   {mapRoute.length > 0 && (
                     <Polyline
                       coordinates={mapRoute}
-                      strokeColor="#5DA7DB"
-                      strokeWidth={3}
+                      strokeColor="#667eea"
+                      strokeWidth={4}
                     />
                   )}
                   <Marker
                     coordinate={startCoords}
-                    pinColor="#22c55e"
+                    pinColor="#10B981"
                     title="Start"
                   />
                   {destinations.map((dest, index) => (
                     <Marker
                       key={dest.id}
                       coordinate={dest.location}
-                      pinColor={index === destinations.length - 1 ? '#FF6B6B' : '#5DA7DB'}
+                      pinColor={index === destinations.length - 1 ? '#EF4444' : '#667eea'}
                       title={dest.name}
                     />
                   ))}
                 </MapView>
                 <View style={styles.mapOverlay}>
-                  <Ionicons name="map" size={24} color="#5DA7DB" />
+                  <View style={styles.mapOverlayIcon}>
+                    <Ionicons name="map" size={20} color="#667eea" />
+                  </View>
                   <Text style={styles.mapOverlayText}>Route Preview</Text>
-                  {recalculating && <ActivityIndicator size="small" color="#5DA7DB" />}
+                  {recalculating && <ActivityIndicator size="small" color="#667eea" />}
                 </View>
                 <TouchableOpacity
                   style={styles.recalculateButton}
                   onPress={handleRecalculate}
                   disabled={recalculating}
                 >
-                  <Ionicons name="refresh" size={20} color="#FFFFFF" />
+                  <Ionicons name="refresh" size={18} color="#FFFFFF" />
                   <Text style={styles.recalculateButtonText}>
-                    {recalculating ? 'Recalculating...' : 'Recalculate'}
+                    {recalculating ? 'Updating...' : 'Recalculate'}
                   </Text>
                 </TouchableOpacity>
               </View>
             )}
 
-            <TouchableOpacity 
-              style={styles.generateButton}
+            <TouchableOpacity
+              style={styles.saveButton}
               onPress={handleSaveTrip}
               disabled={saving}
             >
               <LinearGradient
-                colors={['#5DA7DB', '#0E2954']}
+                colors={['#667eea', '#764ba2']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.generateGradient}
+                style={styles.saveGradient}
               >
                 {saving ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
                     <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" />
-                    <Text style={styles.generateText}>
+                    <Text style={styles.saveText}>
                       {editMode ? 'Save Changes' : 'Save Trip'}
                     </Text>
                   </>
@@ -728,203 +767,229 @@ export default function CreateTripScreen() {
             </TouchableOpacity>
           </View>
         )}
-      </ScrollView>
 
-      <View style={styles.navigationContainer}>
-        {currentStep > 1 && (
-          <TouchableOpacity
-            style={styles.navButton}
-            onPress={() => setCurrentStep(currentStep - 1)}
-          >
-            <Ionicons name="chevron-back" size={20} color="#5DA7DB" />
-            <Text style={styles.navButtonText}>Back</Text>
-          </TouchableOpacity>
-        )}
-        <View style={{ flex: 1 }} />
-        {currentStep < totalSteps && (
-          <TouchableOpacity
-            style={styles.navButtonPrimary}
-            onPress={() => setCurrentStep(currentStep + 1)}
-          >
-            <Text style={styles.navButtonPrimaryText}>Next</Text>
-            <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        )}
-      </View>
-    </LinearGradient>
+        <View style={styles.navigationContainer}>
+          {currentStep > 1 && (
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={() => setCurrentStep(currentStep - 1)}
+            >
+              <Ionicons name="chevron-back" size={20} color="#667eea" />
+              <Text style={styles.navButtonText}>Back</Text>
+            </TouchableOpacity>
+          )}
+          {currentStep < totalSteps && (
+            <>
+              {currentStep > 1 && <View style={{ flex: 1 }} />}
+              <TouchableOpacity
+                style={[styles.navButtonPrimary, currentStep === 1 && { flex: 1 }]}
+                onPress={() => setCurrentStep(currentStep + 1)}
+              >
+                <Text style={styles.navButtonPrimaryText}>Next</Text>
+                <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FAFAFA',
   },
   header: {
+    paddingTop: 56,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 48,
-    paddingBottom: 16,
+    paddingHorizontal: 24,
+    marginBottom: 20,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0E2954',
-  },
-  stepperContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  stepCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F5F9FC',
-    borderWidth: 2,
-    borderColor: '#E8F1F8',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stepCircleActive: {
-    backgroundColor: '#5DA7DB',
-    borderColor: '#5DA7DB',
-  },
-  stepNumber: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#A0B4C8',
-  },
-  stepNumberActive: {
     color: '#FFFFFF',
   },
-  stepLine: {
-    flex: 1,
-    height: 2,
-    backgroundColor: '#E8F1F8',
-    marginHorizontal: 4,
+  progressContainer: {
+    paddingHorizontal: 24,
   },
-  stepLineActive: {
-    backgroundColor: '#5DA7DB',
+  progressBar: {
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
   },
   stepCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    padding: 24,
-    shadowColor: '#0E2954',
+    padding: 32,
+    marginHorizontal: 24,
+    marginTop: 24,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 4,
   },
-  stepHeader: {
-    flexDirection: 'row',
+  stepIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 24,
+    alignSelf: 'center',
   },
   stepTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#0E2954',
-    marginLeft: 12,
+    color: '#1F2937',
+    marginBottom: 8,
+    textAlign: 'center',
   },
   stepDescription: {
-    fontSize: 14,
-    color: '#A0B4C8',
-    marginBottom: 24,
+    fontSize: 15,
+    color: '#6B7280',
+    marginBottom: 32,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   inputGroup: {
-    marginBottom: 20,
-    position: 'relative',
+    marginBottom: 24,
   },
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0E2954',
+    color: '#1F2937',
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F9FC',
+    backgroundColor: '#F9FAFB',
     borderRadius: 16,
     paddingHorizontal: 16,
     height: 56,
     borderWidth: 1,
-    borderColor: '#E8F1F8',
+    borderColor: '#E5E7EB',
+    gap: 12,
   },
   input: {
     flex: 1,
-    fontSize: 16,
-    color: '#0E2954',
-    marginLeft: 12,
+    fontSize: 15,
+    color: '#1F2937',
+  },
+  timeText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#1F2937',
+    fontWeight: '500',
   },
   suggestionsContainer: {
     marginTop: 8,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E8F1F8',
-    maxHeight: 200,
-    overflow: 'hidden',
+    borderColor: '#E5E7EB',
+    maxHeight: 240,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  suggestionsList: {
+    maxHeight: 240,
   },
   suggestionItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 12,
+    alignItems: 'center',
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F9FC',
+    borderBottomColor: '#F3F4F6',
+    gap: 12,
+  },
+  suggestionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   suggestionText: {
     flex: 1,
-    marginLeft: 12,
   },
   suggestionName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#0E2954',
+    color: '#1F2937',
     marginBottom: 4,
   },
   suggestionAddress: {
-    fontSize: 12,
-    color: '#A0B4C8',
-  },
-  addDestinationRow: {
-    flexDirection: 'row',
-    gap: 12,
+    fontSize: 13,
+    color: '#6B7280',
   },
   destinationsList: {
-    marginTop: 16,
+    marginTop: 24,
+  },
+  destinationsHeader: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 16,
   },
   destinationItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F9FC',
+    backgroundColor: '#F9FAFB',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E8F1F8',
+    borderColor: '#E5E7EB',
+    gap: 12,
   },
   destinationNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#5DA7DB',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#667eea',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
   destinationNumberText: {
     fontSize: 14,
@@ -932,24 +997,37 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   destinationName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#0E2954',
+    color: '#1F2937',
+  },
+  removeButton: {
+    padding: 4,
   },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 48,
   },
+  emptyIconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   emptyText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#0E2954',
-    marginTop: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#A0B4C8',
-    marginTop: 4,
+    color: '#6B7280',
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   travelModesGrid: {
     flexDirection: 'row',
@@ -957,71 +1035,95 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   travelModeCard: {
-    width: (width - 88) / 3,
-    aspectRatio: 1,
-    backgroundColor: '#F5F9FC',
-    borderRadius: 16,
-    justifyContent: 'center',
+    width: (width - 96) / 2,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 20,
+    padding: 20,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#E8F1F8',
+    borderColor: '#E5E7EB',
     position: 'relative',
   },
   travelModeCardActive: {
-    backgroundColor: '#EBF5FA',
-    borderColor: '#5DA7DB',
+    backgroundColor: '#EEF2FF',
+    borderColor: '#667eea',
+  },
+  travelModeIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  travelModeIconActive: {
+    backgroundColor: '#667eea',
   },
   travelModeLabel: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#A0B4C8',
-    marginTop: 8,
+    color: '#6B7280',
   },
   travelModeLabelActive: {
-    color: '#5DA7DB',
+    color: '#667eea',
   },
   selectedBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 12,
+    right: 12,
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#5DA7DB',
+    backgroundColor: '#667eea',
     justifyContent: 'center',
     alignItems: 'center',
   },
   previewCard: {
-    backgroundColor: '#F5F9FC',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   previewRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+  },
+  previewIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   previewLabel: {
     fontSize: 12,
-    color: '#A0B4C8',
+    color: '#6B7280',
     marginBottom: 4,
+    fontWeight: '500',
   },
   previewValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#0E2954',
+    color: '#1F2937',
   },
   previewDivider: {
     height: 1,
-    backgroundColor: '#E8F1F8',
-    marginVertical: 12,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 16,
   },
   mapPreview: {
-    height: 300,
-    borderRadius: 16,
+    height: 280,
+    borderRadius: 20,
     overflow: 'hidden',
-    marginBottom: 16,
+    marginBottom: 24,
     position: 'relative',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   map: {
     width: '100%',
@@ -1032,91 +1134,114 @@ const styles = StyleSheet.create({
     top: 16,
     left: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 24,
+    borderRadius: 16,
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  mapOverlayIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   mapOverlayText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0E2954',
+    color: '#1F2937',
   },
   recalculateButton: {
     position: 'absolute',
     bottom: 16,
     right: 16,
-    backgroundColor: '#5DA7DB',
+    backgroundColor: '#667eea',
+    borderRadius: 16,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    shadowColor: '#0E2954',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    gap: 8,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   recalculateButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  generateButton: {
+  saveButton: {
     borderRadius: 16,
     overflow: 'hidden',
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  generateGradient: {
+  saveGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    gap: 8,
+    gap: 10,
   },
-  generateText: {
-    fontSize: 18,
+  saveText: {
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
   },
   navigationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E8F1F8',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+    paddingTop: 32,
   },
   navButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 24,
-    backgroundColor: '#F5F9FC',
-    gap: 4,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: '#F9FAFB',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   navButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#5DA7DB',
+    color: '#667eea',
   },
   navButtonPrimary: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 24,
-    backgroundColor: '#5DA7DB',
-    gap: 4,
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: '#667eea',
+    gap: 6,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   navButtonPrimaryText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#FFFFFF',
   },
 });

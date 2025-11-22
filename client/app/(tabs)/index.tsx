@@ -20,6 +20,7 @@ import { db } from '@/services/firebase';
 import { collection, query, where, orderBy, onSnapshot, limit, getDocs } from 'firebase/firestore';
 import * as Location from 'expo-location';
 import axios from 'axios';
+import LiveTripWidget from '@/components/LiveTripWidget';
 
 const { width } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:5000/api';
@@ -124,7 +125,6 @@ export default function HomeScreen() {
       const userTrips = tripsSnapshot.docs.map(doc => doc.data());
 
       if (userTrips.length > 0) {
-        // Generate AI suggestions based on user history
         const suggestions = [
           {
             id: 1,
@@ -132,7 +132,7 @@ export default function HomeScreen() {
             subtitle: 'Based on your travel style',
             description: 'Coorg Coffee Trail - 2 days',
             icon: 'sparkles',
-            image: 'https://images.unsplash.com/photo-1587241321921-91eed3df0d29?w=400',
+            image: 'https://images.unsplash.com/photo-1560357647-2d624edb51b1?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
             action: () => router.push('/(tabs)/ai-trip-creator'),
           },
           {
@@ -181,7 +181,7 @@ export default function HomeScreen() {
               <Text style={styles.greetingText}>{greeting}</Text>
               <Text style={styles.userName}>{user?.name || 'Traveler'}</Text>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.profileButton}
               onPress={() => router.push('/(tabs)/profile')}
             >
@@ -217,11 +217,11 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           {currentTrip && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.currentTripBadge}
               onPress={() => router.push({
                 pathname: '/(tabs)/create-trip',
-                params: { 
+                params: {
                   editMode: 'true',
                   tripData: JSON.stringify(currentTrip)
                 }
@@ -244,6 +244,8 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        <LiveTripWidget onEndTrip={onRefresh} />
+
         {aiSuggestions.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -259,8 +261,8 @@ export default function HomeScreen() {
               contentContainerStyle={styles.carousel}
             >
               {aiSuggestions.map((suggestion) => (
-                <TouchableOpacity 
-                  key={suggestion.id} 
+                <TouchableOpacity
+                  key={suggestion.id}
                   style={styles.aiCard}
                   onPress={suggestion.action}
                 >
@@ -338,7 +340,7 @@ export default function HomeScreen() {
         <View style={styles.quickActions}>
           <Text style={styles.quickActionsTitle}>Quick Actions</Text>
           <View style={styles.actionsGrid}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionCard}
               onPress={() => router.push('/(tabs)/create-trip')}
             >
@@ -351,7 +353,7 @@ export default function HomeScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionCard}
               onPress={() => router.push('/(tabs)/explore')}
             >
@@ -364,7 +366,7 @@ export default function HomeScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionCard}
               onPress={() => router.push('/(tabs)/discover')}
             >
@@ -377,9 +379,9 @@ export default function HomeScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.actionCard}
-              onPress={() => {/* Navigate to saved trips */}}
+              onPress={() => {/* Navigate to saved trips */ }}
             >
               <LinearGradient
                 colors={['#EF4444', '#DC2626']}

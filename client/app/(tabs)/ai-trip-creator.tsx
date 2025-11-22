@@ -122,6 +122,7 @@ export default function AITripCreatorScreen() {
         },
         {
           headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+          timeout: 120000,
         }
       );
 
@@ -219,7 +220,7 @@ export default function AITripCreatorScreen() {
                     style={[
                       styles.optionButton,
                       inputValue.toLowerCase() === option.toLowerCase() &&
-                        styles.optionButtonActive,
+                      styles.optionButtonActive,
                     ]}
                     onPress={() => handleOptionSelect(option)}
                   >
@@ -227,7 +228,7 @@ export default function AITripCreatorScreen() {
                       style={[
                         styles.optionText,
                         inputValue.toLowerCase() === option.toLowerCase() &&
-                          styles.optionTextActive,
+                        styles.optionTextActive,
                       ]}
                     >
                       {option}

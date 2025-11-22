@@ -2,6 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
+import { Platform } from 'react-native';
 
 export default function TabLayout() {
   const { isAuthenticated } = useAuth();
@@ -13,32 +14,41 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#5DA7DB',
-        tabBarInactiveTintColor: '#A0B4C8',
+        tabBarActiveTintColor: '#667eea',
+        tabBarInactiveTintColor: '#9CA3AF',
         headerShown: false,
         tabBarStyle: {
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
           backgroundColor: '#FFFFFF',
-          borderTopColor: '#E8F1F8',
-          borderTopWidth: 1,
-          height: 70,
-          paddingBottom: 12,
-          paddingTop: 8,
-          elevation: 8,
-          shadowColor: '#0E2954',
+          borderTopWidth: 0,
+          height: Platform.OS === 'ios' ? 88 : 70,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+          paddingTop: 12,
+          paddingHorizontal: 8,
+          elevation: 20,
+          shadowColor: '#667eea',
           shadowOffset: {
             width: 0,
-            height: -4,
+            height: -8,
           },
-          shadowOpacity: 0.1,
-          shadowRadius: 8,
+          shadowOpacity: 0.15,
+          shadowRadius: 16,
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
+          fontSize: 11,
+          fontWeight: '700',
           marginTop: 4,
+          letterSpacing: 0.3,
         },
         tabBarItemStyle: {
-          paddingVertical: 4,
+          paddingVertical: 6,
+          borderRadius: 16,
+          marginHorizontal: 2,
         },
       }}>
       <Tabs.Screen
@@ -46,10 +56,10 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons 
-              name={focused ? "home" : "home-outline"} 
-              size={size} 
-              color={color} 
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={focused ? size + 2 : size}
+              color={color}
             />
           ),
         }}
@@ -59,10 +69,10 @@ export default function TabLayout() {
         options={{
           title: 'Discover',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons 
-              name={focused ? "compass" : "compass-outline"} 
-              size={size} 
-              color={color} 
+            <Ionicons
+              name={focused ? "compass" : "compass-outline"}
+              size={focused ? size + 2 : size}
+              color={color}
             />
           ),
         }}
@@ -72,10 +82,10 @@ export default function TabLayout() {
         options={{
           title: 'Create',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons 
-              name={focused ? "add-circle" : "add-circle-outline"} 
-              size={size + 8} 
-              color={color} 
+            <Ionicons
+              name={focused ? "add-circle" : "add-circle-outline"}
+              size={focused ? size + 10 : size + 8}
+              color={color}
             />
           ),
         }}
@@ -85,10 +95,10 @@ export default function TabLayout() {
         options={{
           title: 'Explore',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons 
-              name={focused ? "search" : "search-outline"} 
-              size={size} 
-              color={color} 
+            <Ionicons
+              name={focused ? "search" : "search-outline"}
+              size={focused ? size + 2 : size}
+              color={color}
             />
           ),
         }}
@@ -98,10 +108,10 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons 
-              name={focused ? "person" : "person-outline"} 
-              size={size} 
-              color={color} 
+            <Ionicons
+              name={focused ? "person" : "person-outline"}
+              size={focused ? size + 2 : size}
+              color={color}
             />
           ),
         }}
@@ -114,6 +124,12 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="trip-preview"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="create-guide"
         options={{
           href: null,
         }}
