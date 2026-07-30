@@ -2,7 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   Animated,
   Dimensions,
@@ -18,6 +18,7 @@ import {
   ImageBackground
 } from 'react-native';
 import { BlurView } from 'expo-blur';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,10 +27,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const { login, googleLogin, loading } = useAuth();
+  const { login, googleLogin, sendPasswordReset, loading } = useAuth();
   const router = useRouter();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+
+  // ✅ FIX: Load remembered email on mount
+  useEffect(() => {
+    AsyncStorage.getItem('rememberedEmail').then(saved => {
+      if (saved) {
+        setEmail(saved);
+        setRememberMe(true);
+      }
+    });
+  }, []);
 
   React.useEffect(() => {
     Animated.parallel([
@@ -54,6 +65,12 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
+      // ✅ FIX: Save email to AsyncStorage only if Remember Me is checked
+      if (rememberMe) {
+        await AsyncStorage.setItem('rememberedEmail', email);
+      } else {
+        await AsyncStorage.removeItem('rememberedEmail');
+      }
       router.replace("/(tabs)");
     } catch (err: any) {
       Alert.alert('Login Failed', err.message || 'Invalid credentials');
@@ -69,10 +86,33 @@ export default function LoginPage() {
     }
   };
 
+  // ✅ FIX: Forgot password now sends a real Firebase reset email
+  const handleForgotPassword = () => {
+    Alert.prompt(
+      'Reset Password',
+      'Enter your email address and we\'ll send you a reset link.',
+      async (inputEmail) => {
+        const target = inputEmail?.trim() || email.trim();
+        if (!target) {
+          Alert.alert('Error', 'Please enter your email address first.');
+          return;
+        }
+        try {
+          await sendPasswordReset(target);
+          Alert.alert('Email Sent', `A password reset link has been sent to ${target}.`);
+        } catch (err: any) {
+          Alert.alert('Error', err.message || 'Failed to send reset email');
+        }
+      },
+      'plain-text',
+      email // pre-fill with whatever is in the email field
+    );
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       <LinearGradient
         colors={['#e8d8f0', '#f0e8f8', '#d8c8e8']}
         style={styles.background}
@@ -88,7 +128,7 @@ export default function LoginPage() {
           />
         </View>
 
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           style={styles.content}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
@@ -141,24 +181,25 @@ export default function LoginPage() {
                       onSubmitEditing={handleLogin}
                       editable={!loading}
                     />
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       onPress={() => setShowPassword(!showPassword)}
                       style={styles.eyeIcon}
                     >
-                      <Ionicons 
-                        name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                        size={20} 
-                        color="rgba(255, 255, 255, 0.7)" 
+                      <Ionicons
+                        name={showPassword ? "eye-outline" : "eye-off-outline"}
+                        size={20}
+                        color="rgba(255, 255, 255, 0.7)"
                       />
                     </TouchableOpacity>
                   </View>
                   <View style={styles.inputUnderline} />
-                  <TouchableOpacity style={styles.forgotButton}>
+                  {/* ✅ FIX: Forgot button now calls handleForgotPassword */}
+                  <TouchableOpacity style={styles.forgotButton} onPress={handleForgotPassword}>
                     <Text style={styles.forgotText}>Forgot?</Text>
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.rememberContainer}
                   onPress={() => setRememberMe(!rememberMe)}
                 >
@@ -170,9 +211,9 @@ export default function LoginPage() {
                   <Text style={styles.rememberText}>Remember me</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
-                  style={styles.loginButton} 
-                  onPress={handleLogin} 
+                <TouchableOpacity
+                  style={styles.loginButton}
+                  onPress={handleLogin}
                   disabled={loading}
                   activeOpacity={0.8}
                 >
@@ -186,8 +227,8 @@ export default function LoginPage() {
                   </LinearGradient>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
-                  onPress={handleGoogleLogin} 
+                <TouchableOpacity
+                  onPress={handleGoogleLogin}
                   style={styles.googleButton}
                   disabled={loading}
                   activeOpacity={0.8}

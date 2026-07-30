@@ -1,33 +1,24 @@
-// server/src/controllers/aiController.js - UPDATED VERSION
+// server/src/controllers/aiController.js
+import Groq from "groq-sdk"
 import axios from "axios"
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+const GROQ_MODEL = "llama-3.3-70b-versatile"
 const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY
 
-const callGemini = async (prompt) => {
+const callGroq = async (prompt) => {
   try {
-    const response = await axios.post(
-      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
-      {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 2048,
-        },
-      },
-      { timeout: 120000 }
-    )
-    // Validate response
-    if (!response.data || !response.data.candidates || response.data.candidates.length === 0) {
-      console.error("Invalid Gemini response:", JSON.stringify(response.data, null, 2));
-      throw new Error("Invalid API response structure");
-    }
-    return response.data.candidates[0].content.parts[0].text.trim()
+    const completion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      model: GROQ_MODEL,
+      temperature: 0.7,
+      max_tokens: 8192,
+    })
+    const text = completion.choices[0]?.message?.content
+    if (!text) throw new Error("No content in Groq response")
+    return text.trim()
   } catch (error) {
-    console.error("Gemini API Error:", error.message)
+    console.error("Groq API Error:", error.message)
     throw new Error("Failed to get AI response")
   }
 }
@@ -106,9 +97,10 @@ Ensure:
 - Budget-appropriate suggestions (budget: ₹500-1000, moderate: ₹1000-3000, luxury: ₹3000+)
 - Include 4-6 main stops
 - Safety warnings if needed
-- Return timing within ${timeAvailable} hours`
+- Return timing within ${timeAvailable} hours
+- Return ONLY the JSON object, no markdown fences or extra text`
 
-    const response = await callGemini(prompt)
+    const response = await callGroq(prompt)
     const jsonMatch = response.match(/\{[\s\S]*\}/)
 
     if (!jsonMatch) {
@@ -144,8 +136,8 @@ Examples:
 
 Improved query:`
 
-    const response = await callGemini(prompt)
-    res.json({ improvedQuery: response.replace(/^["']|["']$/g, '').trim() })
+    const response = await callGroq(prompt)
+    res.json({ improvedQuery: response.replace(/^[\"']|[\"']$/g, '').trim() })
   } catch (error) {
     console.error("Improve Search Query Error:", error.message)
     res.status(500).json({ error: error.message })
@@ -175,7 +167,7 @@ Return ONLY a JSON array of place indices in ranked order (best to worst):
 
 No other text, just the array.`
 
-    const response = await callGemini(prompt)
+    const response = await callGroq(prompt)
     const jsonMatch = response.match(/\[[\s\S]*?\]/)
 
     if (!jsonMatch) {
@@ -222,14 +214,9 @@ Generate optimized sequence in JSON:
   "warnings": ["Warning if tight schedule", "Traffic expected at 5 PM"]
 }
 
-Consider:
-- Minimize backtracking
-- Group nearby locations
-- Account for travel time
-- Warn if schedule is too tight
-- Ensure return by curfew`
+Return ONLY the JSON object.`
 
-    const response = await callGemini(prompt)
+    const response = await callGroq(prompt)
     const jsonMatch = response.match(/\{[\s\S]*\}/)
 
     if (!jsonMatch) {
@@ -246,7 +233,6 @@ Consider:
 
 export const generateGuidePost = async (req, res) => {
   try {
-    const userId = req.user?.userId
     const { userTrips, userPreferences } = req.body
 
     if (!userTrips || !Array.isArray(userTrips)) {
@@ -275,9 +261,9 @@ Generate a guide post in JSON:
   "tags": ["Adventure", "Nature", "Weekend"]
 }
 
-Create 4-6 spots that match their travel style.`
+Return ONLY the JSON object.`
 
-    const response = await callGemini(prompt)
+    const response = await callGroq(prompt)
     const jsonMatch = response.match(/\{[\s\S]*\}/)
 
     if (!jsonMatch) {
@@ -345,9 +331,9 @@ Generate recommendations in JSON:
   ]
 }
 
-4-5 items per category. Focus on real, accessible places near the coordinates.`
+4-5 items per category. Return ONLY the JSON object.`
 
-    const response = await callGemini(prompt)
+    const response = await callGroq(prompt)
     const jsonMatch = response.match(/\{[\s\S]*\}/)
 
     if (!jsonMatch) {
@@ -379,15 +365,15 @@ Weather: ${weather?.description || 'Clear'}
 
 Analyze and provide guidance in JSON:
 {
-  "reorderedStops": [/* If reordering needed, provide new indices */],
+  "reorderedStops": [],
   "warnings": ["Delays expected at X", "Weather alert for Y"],
   "suggestions": ["Take alternate route via Z", "Skip crowded location A"],
   "estimatedDelays": 15
 }
 
-Only suggest reordering if there are significant issues.`
+Return ONLY the JSON object.`
 
-    const response = await callGemini(prompt)
+    const response = await callGroq(prompt)
     const jsonMatch = response.match(/\{[\s\S]*\}/)
 
     if (!jsonMatch) {
@@ -402,7 +388,6 @@ Only suggest reordering if there are significant issues.`
   }
 }
 
-// Keep existing functions from original
 export const generateTripSummary = async (req, res) => {
   try {
     const { title, destination, stops, duration, transport } = req.body
@@ -418,9 +403,9 @@ Stops: ${stops?.join(", ") || 'Various locations'}
 Duration: ${duration || 'Full day'}
 Transport: ${transport || 'driving'}
 
-Keep it to 2-3 sentences and make it appealing for sharing on social media.`
+Keep it to 2-3 sentences and make it appealing for sharing on social media. Return only the summary text.`
 
-    const summary = await callGemini(prompt)
+    const summary = await callGroq(prompt)
     res.json({ summary })
   } catch (error) {
     console.error("Generate Trip Summary Error:", error.message)
@@ -441,7 +426,7 @@ Reviews: ${reviews?.join(" | ") || 'No reviews provided'}
 
 Respond with just a number representing minutes (e.g., 60, 90, 120).`
 
-    const response = await callGemini(prompt)
+    const response = await callGroq(prompt)
     const duration = parseInt(response.match(/\d+/)?.[0] || '60')
     res.json({ duration: isNaN(duration) ? 60 : duration })
   } catch (error) {
@@ -459,7 +444,7 @@ export const analyzeSentiment = async (req, res) => {
 
     const prompt = `Analyze the sentiment of this review and respond with only "positive", "negative", or "neutral": "${text}"`
 
-    const sentiment = await callGemini(prompt)
+    const sentiment = await callGroq(prompt)
     res.json({ sentiment: sentiment.toLowerCase().trim() })
   } catch (error) {
     console.error("Analyze Sentiment Error:", error.message)

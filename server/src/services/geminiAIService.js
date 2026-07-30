@@ -1,7 +1,19 @@
-import axios from "axios"
+import Groq from "groq-sdk"
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+const GROQ_MODEL = "llama-3.3-70b-versatile"
+
+const callGroqInternal = async (prompt) => {
+  const completion = await groq.chat.completions.create({
+    messages: [{ role: "user", content: prompt }],
+    model: GROQ_MODEL,
+    temperature: 0.7,
+    max_tokens: 4096,
+  })
+  const text = completion.choices[0]?.message?.content
+  if (!text) throw new Error("No content in Groq response")
+  return text.trim()
+}
 
 export const estimateVisitDuration = async (placeName, reviews) => {
   try {
@@ -11,23 +23,12 @@ Reviews: ${reviews.join(" | ")}
 
 Respond with just a number representing the estimated duration in minutes.`
 
-    const response = await axios.post(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-      contents: [
-        {
-          parts: [
-            {
-              text: prompt,
-            },
-          ],
-        },
-      ],
-    })
-
-    const duration = Number.parseInt(response.data.candidates[0].content.parts[0].text.trim())
+    const text = await callGroqInternal(prompt)
+    const duration = Number.parseInt(text)
     return isNaN(duration) ? 60 : duration
   } catch (error) {
-    console.error("Error estimating visit duration:", error)
-    return 60 // Default to 60 minutes on error
+    console.error("Error estimating visit duration:", error.message)
+    return 60
   }
 }
 
@@ -41,23 +42,11 @@ Stops: ${tripData.stops.join(", ")}
 Duration: ${tripData.duration} hours
 Transport: ${tripData.transport}
 
-Keep it to 2-3 sentences and make it appealing for sharing on social media.`
+Keep it to 2-3 sentences and make it appealing for sharing on social media. Return only the summary text.`
 
-    const response = await axios.post(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-      contents: [
-        {
-          parts: [
-            {
-              text: prompt,
-            },
-          ],
-        },
-      ],
-    })
-
-    return response.data.candidates[0].content.parts[0].text.trim()
+    return await callGroqInternal(prompt)
   } catch (error) {
-    console.error("Error generating trip summary:", error)
+    console.error("Error generating trip summary:", error.message)
     return "Check out my amazing trip!"
   }
 }
@@ -65,22 +54,10 @@ Keep it to 2-3 sentences and make it appealing for sharing on social media.`
 export const analyzeSentiment = async (text) => {
   try {
     const prompt = `Analyze the sentiment of this review and respond with only "positive", "negative", or "neutral": "${text}"`
-
-    const response = await axios.post(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-      contents: [
-        {
-          parts: [
-            {
-              text: prompt,
-            },
-          ],
-        },
-      ],
-    })
-
-    return response.data.candidates[0].content.parts[0].text.trim().toLowerCase()
+    const result = await callGroqInternal(prompt)
+    return result.toLowerCase()
   } catch (error) {
-    console.error("Error analyzing sentiment:", error)
+    console.error("Error analyzing sentiment:", error.message)
     return "neutral"
   }
 }

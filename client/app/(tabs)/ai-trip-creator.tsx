@@ -20,7 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:5000/api';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.243:5000/api';
 
 const questions = [
   {
@@ -64,6 +64,7 @@ export default function AITripCreatorScreen() {
   const [loading, setLoading] = useState(false);
   const [userLocation, setUserLocation] = useState<any>(null);
   const [loadingLocation, setLoadingLocation] = useState(true);
+  const [usingFallbackLocation, setUsingFallbackLocation] = useState(false);
 
   useEffect(() => {
     getUserLocation();
@@ -75,9 +76,13 @@ export default function AITripCreatorScreen() {
       if (status === 'granted') {
         const location = await Location.getCurrentPositionAsync({});
         setUserLocation(location.coords);
+        setUsingFallbackLocation(false);
+      } else {
+        setUsingFallbackLocation(true);
       }
     } catch (error) {
       console.error('Location error:', error);
+      setUsingFallbackLocation(true);
     } finally {
       setLoadingLocation(false);
     }
@@ -199,6 +204,15 @@ export default function AITripCreatorScreen() {
         style={styles.content}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
+
+        {usingFallbackLocation && (
+          <View style={styles.locationWarning}>
+            <Ionicons name="warning-outline" size={16} color="#92400E" />
+            <Text style={styles.locationWarningText}>
+              Location unavailable — trip will be planned around Bangalore (default).
+            </Text>
+          </View>
+        )}
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
@@ -497,5 +511,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     textTransform: 'capitalize',
+  },
+  locationWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginHorizontal: 24,
+    marginTop: 16,
+    gap: 8,
+  },
+  locationWarningText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400E',
+    fontWeight: '500',
   },
 });

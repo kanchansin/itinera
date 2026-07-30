@@ -23,7 +23,7 @@ import { db } from '@/services/firebase';
 import { doc, setDoc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 const { width } = Dimensions.get('window');
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:5000/api';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.243:5000/api';
 const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
 
 const travelModes = [
@@ -1032,14 +1032,17 @@ const styles = StyleSheet.create({
   travelModesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
+    gap: 16,
   },
   travelModeCard: {
-    width: (width - 96) / 2,
+    width: (width - 80) / 2,
+    aspectRatio: 1.1,
     backgroundColor: '#F9FAFB',
     borderRadius: 20,
     padding: 20,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#E5E7EB',
     position: 'relative',

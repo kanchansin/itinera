@@ -9,7 +9,7 @@ import {
   FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { improveSearchQuery, rankPlacesByPreferences } from '@/services/geminiService';
+import { aiAPI } from '@/services/api';
 import axios from 'axios';
 
 const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
@@ -63,7 +63,8 @@ export default function AIAutocomplete({
 
       if (isVague) {
         try {
-          finalQuery = await improveSearchQuery(searchQuery);
+          const result = await aiAPI.improveSearchQuery(searchQuery);
+          finalQuery = result.improvedQuery || searchQuery;
           setAiImproved(true);
         } catch (error) {
           console.log('AI improvement failed, using original query');
@@ -95,11 +96,10 @@ export default function AIAutocomplete({
               })
             );
 
-            const rankedPlaces = await rankPlacesByPreferences(
-              placeDetails,
-              userPreferences
-            );
-            
+            const result = await aiAPI.rankPlacesByPreferences(placeDetails, userPreferences);
+            const rankedIndices: number[] = result.rankedIndices || [];
+            const rankedPlaces = rankedIndices.map((idx: number) => placeDetails[idx]).filter(Boolean);
+
             places = rankedPlaces.map((detail: any) => ({
               place_id: detail.place_id,
               description: detail.name,

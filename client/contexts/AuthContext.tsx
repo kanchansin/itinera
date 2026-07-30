@@ -1,18 +1,25 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeApp, getApps } from 'firebase/app';
-import { 
+import {
   initializeAuth,
-  getReactNativePersistence,
   getAuth,
-  signInWithEmailAndPassword, 
+  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithCredential,
   GoogleAuthProvider,
   signOut,
   updateProfile,
-  onAuthStateChanged
+  sendPasswordResetEmail,
+  onAuthStateChanged,
+  type Auth,
+  type Persistence,
 } from 'firebase/auth';
+
+const { getReactNativePersistence } = require('@firebase/auth') as {
+  getReactNativePersistence: (storage: unknown) => Persistence;
+};
+
 import { getFirestore, doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
@@ -38,15 +45,13 @@ if (!getApps().length) {
 
 const db = getFirestore(app);
 
-let auth;
-if (app) {
-  try {
-    auth = initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage)
-    });
-  } catch (error) {
-    auth = getAuth(app);
-  }
+let auth: Auth;
+try {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage)
+  });
+} catch {
+  auth = getAuth(app);
 }
 
 interface User {
@@ -62,11 +67,12 @@ interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
   accessToken: string | null;
-  refreshToken: string | null;
   login: (email: string, password: string) => Promise<void>;
   googleLogin: () => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
+  updateUserProfile: (data: { name?: string; bio?: string; profilePicture?: string }) => Promise<void>;
   loading: boolean;
   error: string | null;
 }
@@ -77,7 +83,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userRef = doc(db, 'users', firebaseUser.uid);
           const userSnap = await getDoc(userRef);
           const userData = userSnap.data();
-          
+
           const user: User = {
             id: firebaseUser.uid,
             email: firebaseUser.email || '',
@@ -108,11 +113,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
 
           await AsyncStorage.setItem('accessToken', token);
-          await AsyncStorage.setItem('refreshToken', token);
           await AsyncStorage.setItem('user', JSON.stringify(user));
 
           setAccessToken(token);
-          setRefreshToken(token);
           setUser(user);
           setIsAuthenticated(true);
         } catch (error) {
@@ -120,10 +123,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         await AsyncStorage.removeItem('accessToken');
-        await AsyncStorage.removeItem('refreshToken');
         await AsyncStorage.removeItem('user');
         setAccessToken(null);
-        setRefreshToken(null);
         setUser(null);
         setIsAuthenticated(false);
       }
@@ -217,7 +218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
-      
+
       await updateProfile(firebaseUser, {
         displayName: name,
       });
@@ -247,17 +248,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // ✅ FIX: Real password reset via Firebase email
+  const sendPasswordReset = async (email: string) => {
+    if (!email) throw new Error('Please enter your email address');
+    await sendPasswordResetEmail(auth, email);
+  };
+
+  // ✅ FIX: Allow updating name/bio/profilePicture in Firestore + local state
+  const updateUserProfile = async (data: { name?: string; bio?: string; profilePicture?: string }) => {
+    if (!user?.id) throw new Error('Not authenticated');
+    const { doc: firestoreDoc, updateDoc, serverTimestamp: st } = await import('firebase/firestore');
+    const userRef = firestoreDoc(db, 'users', user.id);
+    await updateDoc(userRef, { ...data, updatedAt: st() });
+    if (data.name && auth.currentUser) {
+      await updateProfile(auth.currentUser, { displayName: data.name });
+    }
+    setUser(prev => prev ? { ...prev, ...data } : prev);
+    const cached = await AsyncStorage.getItem('user');
+    const updated = { ...JSON.parse(cached || '{}'), ...data };
+    await AsyncStorage.setItem('user', JSON.stringify(updated));
+  };
+
   return (
     <AuthContext.Provider
       value={{
         isAuthenticated,
         user,
         accessToken,
-        refreshToken,
         login,
         googleLogin,
         register,
         logout,
+        sendPasswordReset,
+        updateUserProfile,
         loading,
         error,
       }}
