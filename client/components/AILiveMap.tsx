@@ -1,5 +1,4 @@
-// client/components/AILiveMap.tsx
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -15,10 +14,41 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:5000/api';
+const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+const decodePolyline = (encoded: string): { latitude: number; longitude: number }[] => {
+  const points: { latitude: number; longitude: number }[] = [];
+  let index = 0, lat = 0, lng = 0;
+  while (index < encoded.length) {
+    let shift = 0, result = 0, byte: number;
+    do { byte = encoded.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
+    lat += result & 1 ? ~(result >> 1) : result >> 1;
+    shift = 0; result = 0;
+    do { byte = encoded.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
+    lng += result & 1 ? ~(result >> 1) : result >> 1;
+    points.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
+  }
+  return points;
+};
+
+const fetchRoadRoute = async (stops: { latitude: number; longitude: number }[]) => {
+  if (stops.length < 2) return [];
+  const origin = `${stops[0].latitude},${stops[0].longitude}`;
+  const destination = `${stops[stops.length - 1].latitude},${stops[stops.length - 1].longitude}`;
+  const waypoints = stops.slice(1, -1).map(s => `${s.latitude},${s.longitude}`).join('|');
+  const params: Record<string, string> = { origin, destination, mode: 'driving', key: GOOGLE_MAPS_API_KEY || '' };
+  if (waypoints) params.waypoints = `optimize:true|${waypoints}`;
+  const res = await axios.get('https://maps.googleapis.com/maps/api/directions/json', { params });
+  if (res.data.status !== 'OK' || !res.data.routes?.length) return [];
+  const coords: { latitude: number; longitude: number }[] = [];
+  for (const leg of res.data.routes[0].legs)
+    for (const step of leg.steps)
+      coords.push(...decodePolyline(step.polyline.points));
+  return coords;
+};
 
 interface AILiveMapProps {
   stops?: Array<{ latitude: number; longitude: number; name?: string }>;
-  route?: Array<{ latitude: number; longitude: number }>;
   showCurrentLocation?: boolean;
   tripId?: string;
   onLocationUpdate?: (location: Location.LocationObject) => void;
@@ -26,7 +56,6 @@ interface AILiveMapProps {
 
 export default function AILiveMap({
   stops = [],
-  route = [],
   showCurrentLocation = true,
   tripId,
   onLocationUpdate,
@@ -37,43 +66,36 @@ export default function AILiveMap({
   const [showGuidance, setShowGuidance] = useState(false);
   const [loading, setLoading] = useState(true);
   const [remainingStops, setRemainingStops] = useState(stops);
+  const [roadRoute, setRoadRoute] = useState<{ latitude: number; longitude: number }[]>([]);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const guidanceInterval = useRef<NodeJS.Timeout | number | null>(null);
 
   useEffect(() => {
     requestLocationPermission();
-    
-    // Pulse animation for live location marker
+
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.3,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
+        Animated.timing(pulseAnim, { toValue: 1.3, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
       ])
     ).start();
 
-    return () => {
-      if (guidanceInterval.current) {
-        clearInterval(guidanceInterval.current);
-      }
-    };
+    return () => { if (guidanceInterval.current) clearInterval(guidanceInterval.current); };
   }, []);
 
   useEffect(() => {
+    if (remainingStops.length >= 2) {
+      fetchRoadRoute(remainingStops).then(setRoadRoute).catch(() =>
+        setRoadRoute(remainingStops.map(s => ({ latitude: s.latitude, longitude: s.longitude })))
+      );
+    }
+  }, [remainingStops]);
+
+  useEffect(() => {
     if (currentLocation && remainingStops.length > 0) {
-      // Get AI guidance every 2 minutes
       guidanceInterval.current = setInterval(() => {
         getAIGuidance();
       }, 120000);
-
-      // Initial guidance
       getAIGuidance();
     }
 
@@ -92,8 +114,7 @@ export default function AILiveMap({
           accuracy: Location.Accuracy.High,
         });
         setCurrentLocation(location);
-        
-        // Start location tracking
+
         startLocationTracking();
       }
       setLoading(false);
@@ -115,7 +136,6 @@ export default function AILiveMap({
           setCurrentLocation(location);
           onLocationUpdate?.(location);
 
-          // Update remaining stops based on proximity
           const updatedStops = remainingStops.filter((stop) => {
             const distance = getDistance(
               location.coords.latitude,
@@ -123,14 +143,13 @@ export default function AILiveMap({
               stop.latitude,
               stop.longitude
             );
-            return distance > 0.1; // Remove if within 100m
+            return distance > 0.1;
           });
 
           if (updatedStops.length !== remainingStops.length) {
             setRemainingStops(updatedStops);
           }
 
-          // Center map on user
           if (mapRef.current) {
             mapRef.current.animateToRegion(
               {
@@ -157,13 +176,12 @@ export default function AILiveMap({
         currentLatitude: currentLocation.coords.latitude,
         currentLongitude: currentLocation.coords.longitude,
         remainingStops,
-        traffic: { heavy: false }, // Would integrate with traffic API
-        weather: { description: 'Clear' }, // Would integrate with weather API
+        traffic: { heavy: false },
+        weather: { description: 'Clear' },
       });
 
       setAiGuidance(response.data);
 
-      // Show guidance if there are warnings or suggestions
       if (
         response.data.warnings?.length > 0 ||
         response.data.suggestions?.length > 0
@@ -171,7 +189,6 @@ export default function AILiveMap({
         setShowGuidance(true);
       }
 
-      // Reorder stops if AI suggests
       if (response.data.reorderedStops && response.data.reorderedStops.length > 0) {
         const reordered = response.data.reorderedStops.map(
           (idx: number) => remainingStops[idx]
@@ -184,15 +201,15 @@ export default function AILiveMap({
   };
 
   const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Earth's radius in km
+    const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
@@ -222,19 +239,19 @@ export default function AILiveMap({
 
   const initialRegion = currentLocation
     ? {
-        latitude: currentLocation.coords.latitude,
-        longitude: currentLocation.coords.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      }
+      latitude: currentLocation.coords.latitude,
+      longitude: currentLocation.coords.longitude,
+      latitudeDelta: 0.05,
+      longitudeDelta: 0.05,
+    }
     : stops.length > 0
-    ? {
+      ? {
         latitude: stops[0].latitude,
         longitude: stops[0].longitude,
         latitudeDelta: 0.1,
         longitudeDelta: 0.1,
       }
-    : {
+      : {
         latitude: 12.9716,
         longitude: 77.5946,
         latitudeDelta: 0.1,
@@ -253,8 +270,8 @@ export default function AILiveMap({
         showsCompass={true}
         showsTraffic={true}
       >
-        {route.length > 0 && (
-          <Polyline coordinates={route} strokeColor="#667eea" strokeWidth={4} />
+        {roadRoute.length > 0 && (
+          <Polyline coordinates={roadRoute} strokeColor="#667eea" strokeWidth={5} />
         )}
 
         {remainingStops.map((stop, index) => (
